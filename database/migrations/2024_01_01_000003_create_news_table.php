@@ -14,6 +14,10 @@ return new class extends Migration
             $table->string('author');
             $table->string('category');
             $table->string('new_status')->default('draft');
+            $table->string('image')->nullable();
+            $table->text('new_resume')->nullable();
+            $table->string('location')->nullable();
+            $table->longText('content')->nullable();
             $table->unsignedInteger('views')->nullable()->default(0);
             $table->timestamp('published_at')->nullable();
             $table->timestamps();

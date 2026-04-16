@@ -17,6 +17,10 @@ class NewsResource extends JsonResource
             'title'         => $this->title,
             'author'        => $this->author,
             'category'      => $this->category,
+            'image'         => $this->image ? env('APP_URL') . '/' . $this->image : null,
+            'new_resume'    => $this->new_resume,
+            'location'      => $this->location,
+            'content'       => $this->content,
             'status'        => $this->new_status, // draft | published
             'views'         => $this->views ?? 0,
             'published_at'  => optional($this->published_at)->toDateString(),
