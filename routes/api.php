@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\TimeSlotController;
 use App\Http\Controllers\Api\MediationController;
 use App\Http\Controllers\Api\ProgrammationController;
 use App\Http\Controllers\Api\ParticipantEventController;
+use App\Http\Controllers\Api\WaveCheckoutController;
 
 /*
 |--------------------------------------------------------------------------
@@ -86,11 +87,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('participants', ParticipantEventController::class);
 });
 
-// PUBLIC ROUTES
-Route::apiResource('news', NewsController::class)->only('index');
+// PUBLIC ROUTES (accessible sans authentification)
+Route::apiResource('news', NewsController::class)->only('index', 'show');
 Route::apiResource('messes', MesseController::class)->only('store');
-Route::apiResource('events', EventController::class)->only('index');
-Route::apiResource('pastors', PastorController::class)->only('index');
+Route::apiResource('events', EventController::class)->only('index', 'show');
+Route::apiResource('pastors', PastorController::class)->only('index', 'show');
 Route::apiResource('programmations', ProgrammationController::class)->only('index');
 Route::apiResource('services', ServiceController::class)->only('index');
-Route::apiResource('participants', ParticipantEventController::class)->only('index');
+Route::apiResource('participants', ParticipantEventController::class)->only('store');
+Route::apiResource('listens', ListenController::class)->only('store');
+Route::apiResource('mediations', MediationController::class)->only('index', 'show');
+
+// WAVE PAYMENT (PUBLIC - les paroissiens doivent pouvoir payer sans auth admin)
+Route::prefix('wave')->group(function () {
+    Route::post('checkout', [WaveCheckoutController::class, 'createSession']);
+    Route::get('checkout/{id}/status', [WaveCheckoutController::class, 'checkStatus']);
+    Route::post('webhook', [WaveCheckoutController::class, 'webhook']);
+});

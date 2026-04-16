@@ -31,4 +31,10 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'wave' => [
+        'api_key'        => env('WAVE_API_KEY'),
+        'webhook_secret' => env('WAVE_WEBHOOK_SECRET'),
+        'frontend_url'   => env('FRONTEND_URL', 'https://paroisse-st-sauveur-mis-ricordieux.vercel.app'),
+    ],
+
 ];
