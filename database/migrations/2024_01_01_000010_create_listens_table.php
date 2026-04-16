@@ -15,6 +15,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->text('message');
             $table->foreignId('time_slot_id')->constrained('time_slots')->onDelete('cascade');
+            $table->string('request_status')->default('pending'); // pending | accepted | canceled
             $table->timestamp('listen_at');
             $table->timestamps();
             $table->softDeletes();

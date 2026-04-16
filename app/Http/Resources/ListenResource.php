@@ -19,6 +19,7 @@ class ListenResource extends JsonResource
             'phone'         => $this->phone,
             'message'       => $this->message,
             'time_slot_id'  => $this->time_slot_id,
+            'request_status' => $this->request_status,
             'listen_at'     => $this->listen_at,
 
             // Relations
