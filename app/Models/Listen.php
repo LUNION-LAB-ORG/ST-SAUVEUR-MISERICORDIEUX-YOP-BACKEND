@@ -18,7 +18,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $fullname
  * @property string|null $phone
  * @property string $message
- * @property int $time_slot_id
+ * @property string|null $availability
+ * @property int|null $time_slot_id
  * @property string $request_status
  * @property Carbon $listen_at
  * @property Carbon $created_at

@@ -18,8 +18,10 @@ class StoreRequest extends FormRequest
             'fullname'      => 'required|string|max:255',
             'phone'         => 'nullable|string|max:60',
             'message'       => 'required|string',
-            'time_slot_id'  => 'required|integer|exists:time_slots,id',
-            'listen_at'     => 'required|date',
+            'availability'  => 'nullable|string|max:100',
+            'time_slot_id'  => 'nullable|integer|exists:time_slots,id',
+            'listen_at'     => 'nullable|date',
+            'request_status' => 'nullable|string|in:pending,accepted,canceled',
         ];
     }
 }

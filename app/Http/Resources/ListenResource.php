@@ -14,11 +14,12 @@ class ListenResource extends JsonResource
     {
         return [
             'id'            => $this->id,
-            'type'          => $this->type,
-            'fullname'      => $this->fullname,
-            'phone'         => $this->phone,
-            'message'       => $this->message,
-            'time_slot_id'  => $this->time_slot_id,
+            'type'           => $this->type,
+            'fullname'       => $this->fullname,
+            'phone'          => $this->phone,
+            'message'        => $this->message,
+            'availability'   => $this->availability,
+            'time_slot_id'   => $this->time_slot_id,
             'request_status' => $this->request_status,
             'listen_at'     => $this->listen_at,
 

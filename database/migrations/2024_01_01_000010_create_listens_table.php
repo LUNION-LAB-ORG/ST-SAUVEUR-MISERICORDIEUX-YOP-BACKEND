@@ -14,9 +14,10 @@ return new class extends Migration
             $table->string('fullname');
             $table->string('phone')->nullable();
             $table->text('message');
-            $table->foreignId('time_slot_id')->constrained('time_slots')->onDelete('cascade');
+            $table->string('availability')->nullable();
+            $table->foreignId('time_slot_id')->nullable()->constrained('time_slots')->nullOnDelete();
             $table->string('request_status')->default('pending'); // pending | accepted | canceled
-            $table->timestamp('listen_at');
+            $table->timestamp('listen_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
