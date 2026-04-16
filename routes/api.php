@@ -91,6 +91,9 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::apiResource('news', NewsController::class)->only('index', 'show');
 Route::apiResource('messes', MesseController::class)->only('store');
 Route::apiResource('events', EventController::class)->only('index', 'show');
+
+// Inscription publique à un événement (gratuit ou paiement Wave)
+Route::post('/events/{id}/register', [ParticipantEventController::class, 'register']);
 Route::apiResource('pastors', PastorController::class)->only('index', 'show');
 Route::apiResource('programmations', ProgrammationController::class)->only('index');
 Route::apiResource('services', ServiceController::class)->only('index');

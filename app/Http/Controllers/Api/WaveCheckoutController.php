@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Donation;
 use App\Models\Mess;
+use App\Models\ParticipantEvent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -21,7 +22,7 @@ class WaveCheckoutController extends Controller
     {
         $request->validate([
             'amount'           => 'required|numeric|min:100',
-            'type'             => 'required|string|in:donation,messe',
+            'type'             => 'required|string|in:donation,messe,event',
             'client_reference' => 'nullable|string|max:255',
             'donator'          => 'nullable|string|max:255',
             'project'          => 'nullable|string|max:255',
@@ -43,6 +44,10 @@ class WaveCheckoutController extends Controller
         if ($request->type === 'messe') {
             $successUrl = $frontendUrl . '/demande-messe/succes?ref=' . $clientRef;
             $errorUrl   = $frontendUrl . '/demande-messe/erreur?ref=' . $clientRef;
+        } elseif ($request->type === 'event') {
+            $eventId    = $request->input('event_id', '');
+            $successUrl = $frontendUrl . '/evenement/' . $eventId . '/inscription/succes?ref=' . $clientRef;
+            $errorUrl   = $frontendUrl . '/evenement/' . $eventId . '/inscription/erreur?ref=' . $clientRef;
         } else {
             $successUrl = $frontendUrl . '/faire-don/paiement/succes?ref=' . $clientRef;
             $errorUrl   = $frontendUrl . '/faire-don/paiement/erreur?ref=' . $clientRef;
@@ -223,10 +228,29 @@ class WaveCheckoutController extends Controller
                         $mess->update(['request_status' => 'accepted']);
                     }
                 }
+
+                // Confirmer l'inscription à un événement payant
+                if ($clientRef && str_starts_with($clientRef, 'event-')) {
+                    $participant = ParticipantEvent::where('payment_reference', $clientRef)->first();
+                    if ($participant) {
+                        $participant->update([
+                            'payment_status'   => 'succeeded',
+                            'wave_checkout_id' => $sessionId,
+                        ]);
+                    }
+                }
                 break;
 
             case 'checkout.session.payment_failed':
+                // Marquer l'inscription comme échouée
+                $clientRef = $payload['client_reference'] ?? null;
                 Log::info('Wave: paiement échoué', ['data' => $payload]);
+                if ($clientRef && str_starts_with($clientRef, 'event-')) {
+                    $participant = ParticipantEvent::where('payment_reference', $clientRef)->first();
+                    if ($participant) {
+                        $participant->update(['payment_status' => 'failed']);
+                    }
+                }
                 break;
 
             default:

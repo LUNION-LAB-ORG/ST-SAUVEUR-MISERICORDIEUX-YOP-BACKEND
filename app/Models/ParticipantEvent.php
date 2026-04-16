@@ -19,6 +19,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $phone
  * @property string|null $message
  * @property int $event_id
+ * @property string $payment_status
+ * @property string|null $wave_checkout_id
+ * @property string|null $payment_reference
+ * @property float|null $amount
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property string|null $deleted_at

@@ -9,7 +9,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ParticipantEventResource;
 use App\Http\Requests\ParticipantEvent\StoreRequest;
 use App\Http\Requests\ParticipantEvent\UpdateRequest;
+use App\Models\Event;
+use App\Models\ParticipantEvent;
 use App\Repositories\Contracts\ParticipantEventRepositoryInterface;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ParticipantEventController extends Controller
 {
@@ -46,6 +50,120 @@ class ParticipantEventController extends Controller
         );
 
         return ParticipantEventResource::collection($participants);
+    }
+
+    /**
+     * POST /api/events/{id}/register — public
+     * Inscription à un événement (avec ou sans paiement Wave)
+     */
+    public function register(Request $request, string $id): JsonResponse
+    {
+        $event = Event::withCount('participants')->findOrFail($id);
+
+        $request->validate([
+            'fullname' => 'required|string|max:255',
+            'email'    => 'nullable|email|max:255',
+            'phone'    => 'nullable|string|max:30',
+            'message'  => 'nullable|string',
+        ]);
+
+        // Vérifier la deadline d'inscription
+        if ($event->registration_deadline && now()->gt($event->registration_deadline)) {
+            return response()->json([
+                'error' => 'Les inscriptions pour cet événement sont fermées.',
+            ], 422);
+        }
+
+        // Vérifier les places disponibles
+        if ($event->max_participants !== null && $event->participants_count >= $event->max_participants) {
+            return response()->json([
+                'error' => 'Cet événement est complet.',
+            ], 422);
+        }
+
+        // Événement GRATUIT → inscription directe
+        if (!$event->is_paid) {
+            $participant = ParticipantEvent::create([
+                'fullname'       => $request->fullname,
+                'email'          => $request->email,
+                'phone'          => $request->phone,
+                'message'        => $request->message,
+                'event_id'       => $event->id,
+                'payment_status' => 'free',
+            ]);
+
+            return response()->json([
+                'type'        => 'free',
+                'participant' => new ParticipantEventResource($participant->load('event')),
+                'message'     => 'Inscription confirmée !',
+            ], 201);
+        }
+
+        // Événement PAYANT → créer le participant en "pending" puis session Wave
+        $clientRef = 'event-' . $event->id . '-' . now()->timestamp;
+
+        $participant = ParticipantEvent::create([
+            'fullname'         => $request->fullname,
+            'email'            => $request->email,
+            'phone'            => $request->phone,
+            'message'          => $request->message,
+            'event_id'         => $event->id,
+            'payment_status'   => 'pending',
+            'payment_reference'=> $clientRef,
+            'amount'           => $event->price,
+        ]);
+
+        $apiKey      = config('services.wave.api_key');
+        $frontendUrl = config('services.wave.frontend_url', 'https://paroisse-st-sauveur-mis-ricordieux.vercel.app');
+        $successUrl  = $frontendUrl . '/evenement/' . $event->id . '/inscription/succes?ref=' . $clientRef;
+        $errorUrl    = $frontendUrl . '/evenement/' . $event->id . '/inscription/erreur?ref=' . $clientRef;
+
+        if (!$apiKey) {
+            // Dev sans clé Wave → retourner directement la confirmation
+            $participant->update(['payment_status' => 'succeeded']);
+            return response()->json([
+                'type'        => 'paid_dev',
+                'participant' => new ParticipantEventResource($participant->load('event')),
+                'message'     => 'Inscription confirmée (mode dev, paiement simulé).',
+            ], 201);
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type'  => 'application/json',
+            ])->post('https://api.wave.com/v1/checkout/sessions', [
+                'amount'           => strval(intval($event->price)),
+                'currency'         => 'XOF',
+                'success_url'      => $successUrl,
+                'error_url'        => $errorUrl,
+                'client_reference' => $clientRef,
+            ]);
+
+            if ($response->failed()) {
+                Log::error('Wave Event Registration Error', ['status' => $response->status(), 'body' => $response->json()]);
+                $participant->delete();
+                return response()->json(['error' => 'Erreur paiement Wave.'], 502);
+            }
+
+            $session = $response->json();
+
+            $participant->update(['wave_checkout_id' => $session['id']]);
+
+            return response()->json([
+                'type'             => 'paid',
+                'wave_launch_url'  => $session['wave_launch_url'],
+                'checkout_id'      => $session['id'],
+                'amount'           => $session['amount'],
+                'expires_at'       => $session['when_expires'] ?? null,
+                'participant_id'   => $participant->id,
+                'message'          => 'Redirection vers Wave pour le paiement.',
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Wave Event Registration Exception', ['message' => $e->getMessage()]);
+            $participant->delete();
+            return response()->json(['error' => 'Erreur de connexion Wave.'], 503);
+        }
     }
 
     public function store(StoreRequest $request)

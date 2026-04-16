@@ -21,6 +21,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $location_at
  * @property string|null $description
  * @property string|null $image
+ * @property bool $is_paid
+ * @property float|null $price
+ * @property int|null $max_participants
+ * @property Carbon|null $registration_deadline
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property string|null $deleted_at
@@ -34,8 +38,12 @@ class Event extends Model
 	use SoftDeletes;
 
 	protected $casts = [
-		'date_at' => 'datetime',
-		'time_at' => 'datetime'
+		'date_at'               => 'datetime',
+		'time_at'               => 'datetime',
+		'is_paid'               => 'boolean',
+		'price'                 => 'decimal:2',
+		'max_participants'      => 'integer',
+		'registration_deadline' => 'datetime',
 	];
 
 	protected $guarded = [];
