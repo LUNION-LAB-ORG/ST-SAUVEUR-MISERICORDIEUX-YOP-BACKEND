@@ -87,9 +87,17 @@ class NewsController extends Controller
     /**
      * Show news details
      */
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
-        return new NewsResource($this->repo->find($id));
+        $news = $this->repo->find($id);
+
+        // Incrémenter le compteur de vues (sauf si l'utilisateur est authentifié via admin)
+        // Pour le public non-authentifié, on incrémente à chaque consultation.
+        if ($news && !$request->user()) {
+            $news->increment('views');
+        }
+
+        return new NewsResource($news);
     }
 
     /**
