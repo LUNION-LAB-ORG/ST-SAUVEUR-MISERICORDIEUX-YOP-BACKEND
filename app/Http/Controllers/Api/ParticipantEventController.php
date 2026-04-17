@@ -61,10 +61,11 @@ class ParticipantEventController extends Controller
         $event = Event::withCount('participants')->findOrFail($id);
 
         $request->validate([
-            'fullname' => 'required|string|max:255',
-            'email'    => 'nullable|email|max:255',
-            'phone'    => 'nullable|string|max:30',
-            'message'  => 'nullable|string',
+            'fullname'   => 'required|string|max:255',
+            'email'      => 'nullable|email|max:255',
+            'phone'      => 'nullable|string|max:30',
+            'message'    => 'nullable|string',
+            'tier_label' => 'nullable|string|max:100',
         ]);
 
         // Vérifier la deadline d'inscription
@@ -99,7 +100,50 @@ class ParticipantEventController extends Controller
             ], 201);
         }
 
-        // Événement PAYANT → créer le participant en "pending" puis session Wave
+        // Événement PAYANT → déterminer le tier + montant
+        $tiers = is_array($event->pricing_tiers) ? $event->pricing_tiers : [];
+        $tierLabel = $request->input('tier_label');
+        $amount    = $event->price;
+
+        if (count($tiers) > 0) {
+            // Event avec tarifs multiples → tier_label requis
+            if (!$tierLabel) {
+                return response()->json([
+                    'error' => 'Veuillez sélectionner un tarif.',
+                ], 422);
+            }
+
+            $selectedTier = null;
+            foreach ($tiers as $t) {
+                if (($t['label'] ?? null) === $tierLabel) {
+                    $selectedTier = $t;
+                    break;
+                }
+            }
+
+            if (!$selectedTier) {
+                return response()->json([
+                    'error' => 'Tarif invalide.',
+                ], 422);
+            }
+
+            $amount = (float) ($selectedTier['amount'] ?? 0);
+
+            // Vérifier capacité par tier si max_participants défini
+            $tierMax = $selectedTier['max_participants'] ?? null;
+            if ($tierMax !== null && (int) $tierMax > 0) {
+                $tierTaken = ParticipantEvent::where('event_id', $event->id)
+                    ->where('tier_label', $tierLabel)
+                    ->whereIn('payment_status', ['succeeded', 'pending', 'paid'])
+                    ->count();
+                if ($tierTaken >= (int) $tierMax) {
+                    return response()->json([
+                        'error' => "Plus de places disponibles pour le tarif '$tierLabel'.",
+                    ], 422);
+                }
+            }
+        }
+
         $clientRef = 'event-' . $event->id . '-' . now()->timestamp;
 
         $participant = ParticipantEvent::create([
@@ -110,7 +154,8 @@ class ParticipantEventController extends Controller
             'event_id'         => $event->id,
             'payment_status'   => 'pending',
             'payment_reference'=> $clientRef,
-            'amount'           => $event->price,
+            'amount'           => $amount,
+            'tier_label'       => $tierLabel,
         ]);
 
         $apiKey      = config('services.wave.api_key');
@@ -133,7 +178,7 @@ class ParticipantEventController extends Controller
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type'  => 'application/json',
             ])->post('https://api.wave.com/v1/checkout/sessions', [
-                'amount'           => strval(intval($event->price)),
+                'amount'           => strval(intval($amount)),
                 'currency'         => 'XOF',
                 'success_url'      => $successUrl,
                 'error_url'        => $errorUrl,

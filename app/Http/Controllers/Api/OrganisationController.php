@@ -61,6 +61,7 @@ class OrganisationController extends Controller
             'pricing_tiers.*.label' => 'required_with:pricing_tiers|string|max:100',
             'pricing_tiers.*.amount' => 'required_with:pricing_tiers|numeric|min:0',
             'pricing_tiers.*.description' => 'nullable|string|max:255',
+            'pricing_tiers.*.max_participants' => 'nullable|integer|min:1',
             'max_participants'      => 'sometimes|nullable|integer|min:1',
             'registration_deadline' => 'sometimes|nullable|date',
         ]);
@@ -125,6 +126,7 @@ class OrganisationController extends Controller
             'pricing_tiers.*.label' => 'required_with:pricing_tiers|string|max:100',
             'pricing_tiers.*.amount' => 'required_with:pricing_tiers|numeric|min:0',
             'pricing_tiers.*.description' => 'nullable|string|max:255',
+            'pricing_tiers.*.max_participants' => 'nullable|integer|min:1',
             'max_participants'      => 'sometimes|nullable|integer|min:1',
             'registration_deadline' => 'sometimes|nullable|date',
         ]);
