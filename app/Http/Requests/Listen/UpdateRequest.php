@@ -14,12 +14,14 @@ class UpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type'          => 'nullable|string|max:100',
-            'fullname'      => 'sometimes|string|max:255',
-            'phone'         => 'nullable|string|max:60',
-            'message'       => 'sometimes|string',
-            'time_slot_id'  => 'sometimes|integer|exists:time_slots,id',
-            'listen_at'     => 'sometimes|date',
+            'type'           => 'sometimes|nullable|string|max:100',
+            'fullname'       => 'sometimes|string|max:255',
+            'phone'          => 'sometimes|nullable|string|max:60',
+            'message'        => 'sometimes|string',
+            'availability'   => 'sometimes|nullable|string|max:100',
+            'time_slot_id'   => 'sometimes|nullable|integer|exists:time_slots,id',
+            'listen_at'      => 'sometimes|nullable|date',
+            'request_status' => 'sometimes|string|in:pending,accepted,canceled',
         ];
     }
 }
