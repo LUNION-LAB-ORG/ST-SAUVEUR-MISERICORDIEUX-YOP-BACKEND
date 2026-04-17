@@ -19,6 +19,8 @@ class UpdateRequest extends FormRequest
             'author'           => 'sometimes|string|max:255',
             'category'         => 'sometimes|string|max:255',
             'mediation_status' => 'sometimes|in:draft,published,archived',
+            'image'            => 'sometimes|nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+            'content'          => 'sometimes|nullable|string',
         ];
     }
 }

@@ -9,6 +9,7 @@ use App\Http\Resources\MediationResource;
 use App\Repositories\Contracts\MediationRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 
 class MediationController extends Controller
 {
@@ -68,7 +69,14 @@ class MediationController extends Controller
      */
     public function store(StoreRequest $request)
     {
-        $mediation = $this->repo->create($request->validated());
+        $data = $request->validated();
+
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('mediations', 'public');
+            $data['image'] = 'storage/' . $path;
+        }
+
+        $mediation = $this->repo->create($data);
 
         return (new MediationResource($mediation))
             ->response()
@@ -95,7 +103,20 @@ class MediationController extends Controller
      */
     public function update(UpdateRequest $request, string $id)
     {
-        $mediation = $this->repo->update($id, $request->validated());
+        $data = $request->validated();
+
+        $existing = $this->repo->find($id);
+
+        if ($request->hasFile('image')) {
+            // Supprimer l'ancienne image si existe
+            if ($existing && $existing->image && Storage::disk('public')->exists(preg_replace('#^storage/#', '', $existing->image))) {
+                Storage::disk('public')->delete(preg_replace('#^storage/#', '', $existing->image));
+            }
+            $path = $request->file('image')->store('mediations', 'public');
+            $data['image'] = 'storage/' . $path;
+        }
+
+        $mediation = $this->repo->update($id, $data);
         return new MediationResource($mediation);
     }
 
