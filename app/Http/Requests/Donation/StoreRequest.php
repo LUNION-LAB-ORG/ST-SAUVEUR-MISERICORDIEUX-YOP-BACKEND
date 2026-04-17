@@ -15,10 +15,13 @@ class StoreRequest extends FormRequest
     {
         return [
             'donator'         => 'required|string|max:100',
+            'donation_type'   => 'nullable|string|in:monetaire,nature',
+            // amount: autoriser 0 pour don en nature
             'amount'          => 'required|numeric|min:0',
             'project'         => 'required|string|max:100',
-            'paymethod'       => 'required|string|max:50',
-            'paytransaction'  => 'required|string|max:50',
+            // paymethod + paytransaction optionnels (absents pour dons en nature)
+            'paymethod'       => 'nullable|string|max:50',
+            'paytransaction'  => 'nullable|string|max:100',
             'description'     => 'nullable|string',
             'donation_at'     => 'required|date',
         ];

@@ -103,7 +103,7 @@ Route::apiResource('events', EventController::class)->only('index', 'show');
 Route::post('/events/{id}/register', [ParticipantEventController::class, 'register']);
 Route::apiResource('pastors', PastorController::class)->only('index', 'show');
 Route::apiResource('programmations', ProgrammationController::class)->only('index');
-Route::apiResource('services', ServiceController::class)->only('index');
+Route::apiResource('services', ServiceController::class)->only('index', 'show');
 Route::apiResource('participants', ParticipantEventController::class)->only('store');
 Route::apiResource('listens', ListenController::class)->only('store');
 Route::apiResource('mediations', MediationController::class)->only('index', 'show');

@@ -15,10 +15,11 @@ class UpdateRequest extends FormRequest
     {
         return [
             'donator'         => 'sometimes|string|max:100',
+            'donation_type'   => 'sometimes|string|in:monetaire,nature',
             'amount'          => 'sometimes|numeric|min:0',
             'project'         => 'sometimes|string|max:100',
-            'paymethod'       => 'sometimes|string|max:50',
-            'paytransaction'  => 'sometimes|string|max:50',
+            'paymethod'       => 'sometimes|nullable|string|max:50',
+            'paytransaction'  => 'sometimes|nullable|string|max:100',
             'description'     => 'nullable|string',
             'donation_at'     => 'sometimes|date',
         ];

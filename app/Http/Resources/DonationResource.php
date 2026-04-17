@@ -6,14 +6,12 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class DonationResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     */
     public function toArray($request): array
     {
         return [
             'id'             => $this->id,
             'donator'        => $this->donator,
+            'donation_type'  => $this->donation_type ?? 'monetaire',
             'amount'         => (float) $this->amount,
             'project'        => $this->project,
             'paymethod'      => $this->paymethod,

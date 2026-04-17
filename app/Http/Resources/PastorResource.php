@@ -15,7 +15,7 @@ class PastorResource extends JsonResource
         return [
             'id'          => $this->id,
             'fullname'    => $this->fullname,
-            'photo'       => env('APP_URL') . '/' . $this->photo,
+            'photo'       => $this->photo ? env('APP_URL') . '/' . ltrim($this->photo, '/') : null,
             'started_at'  => $this->started_at,
             'ended_at'    => $this->ended_at,
             'description' => $this->description,
