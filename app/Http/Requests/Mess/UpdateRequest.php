@@ -20,6 +20,7 @@ class UpdateRequest extends FormRequest
             'phone'           => 'sometimes|string|max:60',
             'message'         => 'nullable|string',
             'request_status'  => 'sometimes|in:pending,accepted,canceled',
+            'payment_status'  => 'sometimes|nullable|in:pending,succeeded,failed',
             'amount'          => 'sometimes|numeric|min:0',
             'date_at'         => 'sometimes|date',
             'time_at'         => 'sometimes',
