@@ -92,6 +92,8 @@ class OrganisationController extends Controller
             'registration_deadline'   => $data['registration_deadline'] ?? null,
         ]);
 
+        try { \App\Services\NotificationService::forOrganisation($org); } catch (\Throwable $e) {}
+
         return (new OrganisationResource($org))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);

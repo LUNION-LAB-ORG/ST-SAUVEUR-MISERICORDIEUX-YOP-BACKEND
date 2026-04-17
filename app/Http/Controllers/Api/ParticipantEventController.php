@@ -93,6 +93,8 @@ class ParticipantEventController extends Controller
                 'payment_status' => 'free',
             ]);
 
+            try { \App\Services\NotificationService::forEventRegistration($participant, $event); } catch (\Throwable $e) {}
+
             return response()->json([
                 'type'        => 'free',
                 'participant' => new ParticipantEventResource($participant->load('event')),

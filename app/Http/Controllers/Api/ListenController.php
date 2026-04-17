@@ -70,6 +70,8 @@ class ListenController extends Controller
     {
         $listen = $this->repo->create($request->validated());
 
+        try { \App\Services\NotificationService::forListen($listen); } catch (\Throwable $e) {}
+
         return (new ListenResource($listen))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);

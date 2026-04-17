@@ -70,6 +70,9 @@ class MesseController extends Controller
     {
         $messe = $this->repo->create($request->validated());
 
+        // Notification admin
+        try { \App\Services\NotificationService::forMesse($messe); } catch (\Throwable $e) {}
+
         return (new MessResource($messe))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);

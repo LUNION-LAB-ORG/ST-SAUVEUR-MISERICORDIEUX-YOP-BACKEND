@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\ProgrammationController;
 use App\Http\Controllers\Api\ParticipantEventController;
 use App\Http\Controllers\Api\WaveCheckoutController;
 use App\Http\Controllers\Api\OrganisationController;
+use App\Http\Controllers\Api\NotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -92,6 +93,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Convertir une demande d'organisation acceptée en événement officiel
     Route::post('/organisations/{id}/convert-to-event', [OrganisationController::class, 'convertToEvent']);
+
+    // Notifications admin
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 });
 
 // PUBLIC ROUTES (accessible sans authentification)

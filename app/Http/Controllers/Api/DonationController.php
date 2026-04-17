@@ -66,6 +66,8 @@ class DonationController extends Controller
     {
         $donation = $this->repo->create($request->validated());
 
+        try { \App\Services\NotificationService::forDonation($donation); } catch (\Throwable $e) {}
+
         return (new DonationResource($donation))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
