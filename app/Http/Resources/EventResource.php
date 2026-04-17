@@ -18,6 +18,7 @@ class EventResource extends JsonResource
             'location_at'            => $this->location_at,
             'is_paid'                => (bool) $this->is_paid,
             'price'                  => $this->price,
+            'pricing_tiers'          => $this->pricing_tiers,
             'max_participants'       => $this->max_participants,
             'registration_deadline'  => optional($this->registration_deadline)->toDateTimeString(),
             'participants_count'     => $this->whenLoaded('participants', fn() => $this->participants->count(), $this->participants_count ?? null),

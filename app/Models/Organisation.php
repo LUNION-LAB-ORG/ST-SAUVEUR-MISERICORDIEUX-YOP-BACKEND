@@ -18,5 +18,10 @@ class Organisation extends Model
 
     protected $casts = [
         'date' => 'date',
+        'is_paid' => 'boolean',
+        'price' => 'decimal:2',
+        'max_participants' => 'integer',
+        'registration_deadline' => 'datetime',
+        'pricing_tiers' => 'array',
     ];
 }

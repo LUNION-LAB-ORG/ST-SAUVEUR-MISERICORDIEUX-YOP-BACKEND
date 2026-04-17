@@ -20,10 +20,14 @@ class StoreRequest extends FormRequest
             'location_at'            => 'required|string|max:150',
             'description'            => 'nullable|string',
             'image'                  => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
-            'is_paid'                => 'nullable|boolean',
-            'price'                  => 'nullable|numeric|min:0',
-            'max_participants'       => 'nullable|integer|min:1',
-            'registration_deadline'  => 'nullable|date',
+            'is_paid'                 => 'nullable|boolean',
+            'price'                   => 'nullable|numeric|min:0',
+            'pricing_tiers'           => 'nullable|array',
+            'pricing_tiers.*.label'   => 'required_with:pricing_tiers|string|max:100',
+            'pricing_tiers.*.amount'  => 'required_with:pricing_tiers|numeric|min:0',
+            'pricing_tiers.*.description' => 'nullable|string|max:255',
+            'max_participants'        => 'nullable|integer|min:1',
+            'registration_deadline'   => 'nullable|date',
         ];
     }
 }

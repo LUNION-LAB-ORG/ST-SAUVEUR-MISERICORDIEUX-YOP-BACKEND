@@ -89,6 +89,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Organisations — gestion admin (list/show/update/destroy)
     Route::apiResource('organisations', OrganisationController::class)->except('store');
+
+    // Convertir une demande d'organisation acceptée en événement officiel
+    Route::post('/organisations/{id}/convert-to-event', [OrganisationController::class, 'convertToEvent']);
 });
 
 // PUBLIC ROUTES (accessible sans authentification)

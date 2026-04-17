@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\EventResource;
 use App\Http\Resources\OrganisationResource;
+use App\Models\Event;
 use App\Models\Organisation;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -49,6 +52,14 @@ class OrganisationController extends Controller
             'description'           => 'required|string|min:10',
             'estimatedParticipants' => 'nullable|string|max:20',
             'request_status'        => 'sometimes|in:pending,accepted,canceled',
+            'is_paid'               => 'sometimes|boolean',
+            'price'                 => 'sometimes|nullable|numeric|min:0',
+            'pricing_tiers'         => 'sometimes|nullable|array',
+            'pricing_tiers.*.label' => 'required_with:pricing_tiers|string|max:100',
+            'pricing_tiers.*.amount' => 'required_with:pricing_tiers|numeric|min:0',
+            'pricing_tiers.*.description' => 'nullable|string|max:255',
+            'max_participants'      => 'sometimes|nullable|integer|min:1',
+            'registration_deadline' => 'sometimes|nullable|date',
         ]);
 
         $org = Organisation::create([
@@ -62,6 +73,11 @@ class OrganisationController extends Controller
             'description'             => $data['description'],
             'estimated_participants'  => $data['estimatedParticipants'] ?? null,
             'request_status'          => $data['request_status'] ?? 'pending',
+            'is_paid'                 => $data['is_paid'] ?? false,
+            'price'                   => $data['price'] ?? null,
+            'pricing_tiers'           => $data['pricing_tiers'] ?? null,
+            'max_participants'        => $data['max_participants'] ?? null,
+            'registration_deadline'   => $data['registration_deadline'] ?? null,
         ]);
 
         return (new OrganisationResource($org))
@@ -89,6 +105,14 @@ class OrganisationController extends Controller
             'description'           => 'sometimes|string|min:10',
             'estimatedParticipants' => 'sometimes|nullable|string|max:20',
             'request_status'        => 'sometimes|in:pending,accepted,canceled',
+            'is_paid'               => 'sometimes|boolean',
+            'price'                 => 'sometimes|nullable|numeric|min:0',
+            'pricing_tiers'         => 'sometimes|nullable|array',
+            'pricing_tiers.*.label' => 'required_with:pricing_tiers|string|max:100',
+            'pricing_tiers.*.amount' => 'required_with:pricing_tiers|numeric|min:0',
+            'pricing_tiers.*.description' => 'nullable|string|max:255',
+            'max_participants'      => 'sometimes|nullable|integer|min:1',
+            'registration_deadline' => 'sometimes|nullable|date',
         ]);
 
         $mapping = [
@@ -118,5 +142,52 @@ class OrganisationController extends Controller
             'status'  => 'success',
             'message' => 'Demande supprimée',
         ], Response::HTTP_NO_CONTENT);
+    }
+
+    /**
+     * Convertir une demande d'organisation acceptée en événement officiel
+     * POST /api/organisations/{id}/convert-to-event
+     */
+    public function convertToEvent(string $id): JsonResponse
+    {
+        $org = Organisation::findOrFail($id);
+
+        if ($org->request_status !== 'accepted') {
+            return response()->json([
+                'error' => "La demande doit être acceptée avant d'être convertie en événement.",
+            ], 422);
+        }
+
+        if ($org->converted_event_id) {
+            return response()->json([
+                'error' => 'Cette demande a déjà été convertie en événement (ID ' . $org->converted_event_id . ').',
+            ], 422);
+        }
+
+        $title = ucfirst($org->event_type);
+        if ($org->movement) {
+            $title .= ' — ' . ucfirst($org->movement);
+        }
+
+        $event = Event::create([
+            'title'                  => $title,
+            'description'            => $org->description,
+            'date_at'                => $org->date,
+            'time_at'                => $org->start_time,
+            'location_at'            => 'Paroisse Saint-Sauveur',
+            'is_paid'                => $org->is_paid ?? false,
+            'price'                  => $org->price,
+            'max_participants'       => $org->max_participants,
+            'registration_deadline'  => $org->registration_deadline,
+        ]);
+
+        $org->update(['converted_event_id' => $event->id]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Demande convertie en événement avec succès.',
+            'event'  => new EventResource($event),
+            'organisation' => new OrganisationResource($org->fresh()),
+        ], Response::HTTP_CREATED);
     }
 }

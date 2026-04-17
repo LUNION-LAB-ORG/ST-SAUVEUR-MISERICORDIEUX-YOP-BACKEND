@@ -42,6 +42,7 @@ class Event extends Model
 		'time_at'               => 'datetime',
 		'is_paid'               => 'boolean',
 		'price'                 => 'decimal:2',
+		'pricing_tiers'         => 'array',
 		'max_participants'      => 'integer',
 		'registration_deadline' => 'datetime',
 	];

@@ -21,6 +21,12 @@ class OrganisationResource extends JsonResource
             'description'             => $this->description,
             'estimatedParticipants'   => $this->estimated_participants,
             'request_status'          => $this->request_status,
+            'is_paid'                 => (bool) $this->is_paid,
+            'price'                   => $this->price,
+            'pricing_tiers'           => $this->pricing_tiers,
+            'max_participants'        => $this->max_participants,
+            'registration_deadline'   => $this->registration_deadline,
+            'converted_event_id'      => $this->converted_event_id,
             'created_at'              => optional($this->created_at)->toDateTimeString(),
         ];
     }
