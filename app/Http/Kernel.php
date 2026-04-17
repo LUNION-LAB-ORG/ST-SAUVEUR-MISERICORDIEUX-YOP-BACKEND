@@ -39,7 +39,10 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            // Middleware stateful désactivé : on utilise Sanctum en mode Bearer token
+            // (AuthController::login retourne un plainTextToken), pas en mode SPA/session.
+            // L'activer causait des 419 CSRF sur les routes publiques depuis le frontend.
+            // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
