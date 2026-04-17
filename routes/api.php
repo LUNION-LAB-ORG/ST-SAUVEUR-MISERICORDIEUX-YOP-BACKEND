@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\ParticipantEventController;
 use App\Http\Controllers\Api\WaveCheckoutController;
 use App\Http\Controllers\Api\OrganisationController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\SettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -100,6 +101,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+
+    // Paramètres admin (mutations)
+    Route::put('/settings', [SettingController::class, 'updateMany']);
+    Route::post('/settings/upload-image', [SettingController::class, 'uploadImage']);
 });
 
 // PUBLIC ROUTES (accessible sans authentification)
@@ -118,6 +123,10 @@ Route::apiResource('mediations', MediationController::class)->only('index', 'sho
 
 // Soumission publique d'une demande d'organisation
 Route::apiResource('organisations', OrganisationController::class)->only('store');
+
+// Settings publics (footer, header...)
+Route::get('/settings', [SettingController::class, 'index']);
+Route::get('/settings/map', [SettingController::class, 'map']);
 
 // WAVE PAYMENT (PUBLIC - les paroissiens doivent pouvoir payer sans auth admin)
 Route::prefix('wave')->group(function () {
