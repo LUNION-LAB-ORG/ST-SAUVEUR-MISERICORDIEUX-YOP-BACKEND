@@ -78,9 +78,16 @@ class MediationController extends Controller
     /**
      * Show mediation details
      */
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
-        return new MediationResource($this->repo->find($id));
+        $mediation = $this->repo->find($id);
+
+        // Incrémenter les vues sur consultation publique (non-authentifiée)
+        if ($mediation && !$request->user()) {
+            $mediation->increment('views');
+        }
+
+        return new MediationResource($mediation);
     }
 
     /**
