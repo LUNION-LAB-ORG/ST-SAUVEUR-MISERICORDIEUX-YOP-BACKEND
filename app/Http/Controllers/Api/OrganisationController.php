@@ -42,6 +42,9 @@ class OrganisationController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
+            'title'                 => 'nullable|string|max:255',
+            'location_at'           => 'nullable|string|max:255',
+            'image'                 => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'isParishMember'        => 'required|in:yes,no',
             'movement'              => 'nullable|string|max:255',
             'email'                 => 'required|email|max:255',
@@ -62,7 +65,15 @@ class OrganisationController extends Controller
             'registration_deadline' => 'sometimes|nullable|date',
         ]);
 
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = 'storage/' . $request->file('image')->store('organisations', 'public');
+        }
+
         $org = Organisation::create([
+            'title'                   => $data['title'] ?? null,
+            'location_at'             => $data['location_at'] ?? null,
+            'image'                   => $imagePath,
             'is_parish_member'        => $data['isParishMember'],
             'movement'                => $data['movement'] ?? null,
             'email'                   => $data['email'],
@@ -95,6 +106,9 @@ class OrganisationController extends Controller
         $org = Organisation::findOrFail($id);
 
         $data = $request->validate([
+            'title'                 => 'sometimes|nullable|string|max:255',
+            'location_at'           => 'sometimes|nullable|string|max:255',
+            'image'                 => 'sometimes|nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'isParishMember'        => 'sometimes|in:yes,no',
             'movement'              => 'sometimes|nullable|string|max:255',
             'email'                 => 'sometimes|email|max:255',
@@ -114,6 +128,10 @@ class OrganisationController extends Controller
             'max_participants'      => 'sometimes|nullable|integer|min:1',
             'registration_deadline' => 'sometimes|nullable|date',
         ]);
+
+        if ($request->hasFile('image')) {
+            $data['image'] = 'storage/' . $request->file('image')->store('organisations', 'public');
+        }
 
         $mapping = [
             'isParishMember'        => 'is_parish_member',
@@ -164,19 +182,18 @@ class OrganisationController extends Controller
             ], 422);
         }
 
-        $title = ucfirst($org->event_type);
-        if ($org->movement) {
-            $title .= ' — ' . ucfirst($org->movement);
-        }
+        $title = $org->title ?: ucfirst($org->event_type) . ($org->movement ? ' — ' . ucfirst($org->movement) : '');
 
         $event = Event::create([
             'title'                  => $title,
             'description'            => $org->description,
             'date_at'                => $org->date,
             'time_at'                => $org->start_time,
-            'location_at'            => 'Paroisse Saint-Sauveur',
+            'location_at'            => $org->location_at ?: 'Paroisse Saint-Sauveur',
+            'image'                  => $org->image,
             'is_paid'                => $org->is_paid ?? false,
             'price'                  => $org->price,
+            'pricing_tiers'          => $org->pricing_tiers,
             'max_participants'       => $org->max_participants,
             'registration_deadline'  => $org->registration_deadline,
         ]);

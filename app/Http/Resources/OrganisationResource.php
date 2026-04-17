@@ -11,6 +11,9 @@ class OrganisationResource extends JsonResource
     {
         return [
             'id'                      => $this->id,
+            'title'                   => $this->title,
+            'location_at'             => $this->location_at,
+            'image'                   => $this->image ? env('APP_URL') . '/' . $this->image : null,
             'isParishMember'          => $this->is_parish_member,
             'movement'                => $this->movement,
             'email'                   => $this->email,
