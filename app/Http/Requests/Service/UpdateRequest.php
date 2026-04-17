@@ -16,7 +16,10 @@ class UpdateRequest extends FormRequest
         return [
             'title'       => 'sometimes|string|max:255',
             'description' => 'sometimes|string',
-            'image'       => 'nullable|string|max:255',
+            'image'       => 'sometimes|nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+            'content'     => 'sometimes|nullable|string',
+            'leader'      => 'sometimes|nullable|string|max:150',
+            'schedule'    => 'sometimes|nullable|string|max:255',
         ];
     }
 }

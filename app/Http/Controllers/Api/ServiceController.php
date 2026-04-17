@@ -9,6 +9,7 @@ use App\Http\Resources\ServiceResource;
 use App\Repositories\Contracts\ServiceRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 
 class ServiceController extends Controller
 {
@@ -19,9 +20,6 @@ class ServiceController extends Controller
         $this->repo = $repo;
     }
 
-    /**
-     * List services (paginated)
-     */
     public function index(Request $request)
     {
         $conditions = [];
@@ -46,38 +44,44 @@ class ServiceController extends Controller
         return ServiceResource::collection($services);
     }
 
-    /**
-     * Store a new service
-     */
     public function store(StoreRequest $request)
     {
-        $service = $this->repo->create($request->validated());
+        $data = $request->validated();
+
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('services', 'public');
+            $data['image'] = 'storage/' . $path;
+        }
+
+        $service = $this->repo->create($data);
 
         return (new ServiceResource($service))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
     }
 
-    /**
-     * Show service details
-     */
     public function show(string $id)
     {
         return new ServiceResource($this->repo->find($id));
     }
 
-    /**
-     * Update service
-     */
     public function update(UpdateRequest $request, string $id)
     {
-        $service = $this->repo->update($id, $request->validated());
+        $data = $request->validated();
+        $existing = $this->repo->find($id);
+
+        if ($request->hasFile('image')) {
+            if ($existing && $existing->image && Storage::disk('public')->exists(preg_replace('#^storage/#', '', $existing->image))) {
+                Storage::disk('public')->delete(preg_replace('#^storage/#', '', $existing->image));
+            }
+            $path = $request->file('image')->store('services', 'public');
+            $data['image'] = 'storage/' . $path;
+        }
+
+        $service = $this->repo->update($id, $data);
         return new ServiceResource($service);
     }
 
-    /**
-     * Soft delete service
-     */
     public function destroy(string $id)
     {
         $this->repo->delete($id);

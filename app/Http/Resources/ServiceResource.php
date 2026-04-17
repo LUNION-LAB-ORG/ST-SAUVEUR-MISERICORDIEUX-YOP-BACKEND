@@ -7,9 +7,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class ServiceResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     */
     public function toArray(Request $request): array
     {
         return [
@@ -17,9 +14,10 @@ class ServiceResource extends JsonResource
             'title'       => $this->title,
             'description' => $this->description,
             'image'       => $this->image ? env('APP_URL') . '/' . ltrim($this->image, '/') : null,
-
-            // timestamps
-            'created_at'    => optional($this->created_at)->toDateTimeString(),
+            'content'     => $this->content,
+            'leader'      => $this->leader,
+            'schedule'    => $this->schedule,
+            'created_at'  => optional($this->created_at)->toDateTimeString(),
         ];
     }
 }
