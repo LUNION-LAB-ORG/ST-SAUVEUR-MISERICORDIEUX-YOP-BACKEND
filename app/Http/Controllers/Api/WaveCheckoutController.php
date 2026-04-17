@@ -27,6 +27,14 @@ class WaveCheckoutController extends Controller
             'donator'          => 'nullable|string|max:255',
             'project'          => 'nullable|string|max:255',
             'description'      => 'nullable|string',
+            // Champs spécifiques messe
+            'mess_type'        => 'nullable|string|max:100',
+            'email'            => 'nullable|email|max:255',
+            'phone'            => 'nullable|string|max:30',
+            'date_at'          => 'nullable|date',
+            'time_at'          => 'nullable',
+            // Champs spécifiques event
+            'event_id'         => 'nullable|integer',
         ]);
 
         $apiKey = config('services.wave.api_key');
@@ -91,16 +99,35 @@ class WaveCheckoutController extends Controller
                     'donation_at'   => now(),
                 ]);
             } elseif ($request->type === 'messe') {
+                // Parser date_at / time_at envoyés par le frontend
+                try {
+                    $dateAt = $request->date_at
+                        ? \Carbon\Carbon::parse($request->date_at)->toDateString()
+                        : now()->toDateString();
+                } catch (\Exception $e) {
+                    $dateAt = now()->toDateString();
+                }
+                try {
+                    $timeAt = $request->time_at
+                        ? \Carbon\Carbon::parse($request->time_at)->toTimeString()
+                        : now()->toTimeString();
+                } catch (\Exception $e) {
+                    $timeAt = now()->toTimeString();
+                }
+
                 Mess::create([
-                    'type'           => $request->mess_type ?? 'intention',
-                    'fullname'       => $request->donator ?? 'Anonyme',
-                    'email'          => $request->email ?? null,
-                    'phone'          => $request->phone ?? '',
-                    'message'        => $request->description ?? '',
-                    'request_status' => 'pending',
-                    'amount'         => $request->amount,
-                    'date_at'        => now()->toDateString(),
-                    'time_at'        => now()->toTimeString(),
+                    'type'             => $request->mess_type ?? 'intention',
+                    'fullname'         => $request->donator ?? 'Anonyme',
+                    'email'            => $request->email ?? null,
+                    'phone'            => $request->phone ?? '',
+                    'message'          => $request->description ?? '',
+                    'request_status'   => 'pending',
+                    'payment_status'   => 'pending',
+                    'amount'           => $request->amount,
+                    'date_at'          => $dateAt,
+                    'time_at'          => $timeAt,
+                    'wave_reference'   => $clientRef,
+                    'wave_checkout_id' => $session['id'] ?? null,
                 ]);
             }
 
@@ -150,6 +177,30 @@ class WaveCheckoutController extends Controller
                     $donation->update([
                         'paytransaction' => $session['transaction_id'] ?? $id,
                     ]);
+                }
+
+                // Fallback messe (si webhook pas encore reçu)
+                $clientRef = $session['client_reference'] ?? null;
+                if ($clientRef && str_starts_with($clientRef, 'messe-')) {
+                    $mess = Mess::where('wave_reference', $clientRef)->first();
+                    if ($mess && $mess->payment_status !== 'succeeded') {
+                        $mess->update([
+                            'request_status'   => 'accepted',
+                            'payment_status'   => 'succeeded',
+                            'wave_checkout_id' => $id,
+                        ]);
+                    }
+                }
+
+                // Fallback événement payant (si webhook pas encore reçu)
+                if ($clientRef && str_starts_with($clientRef, 'event-')) {
+                    $participant = ParticipantEvent::where('payment_reference', $clientRef)->first();
+                    if ($participant && $participant->payment_status !== 'succeeded') {
+                        $participant->update([
+                            'payment_status'   => 'succeeded',
+                            'wave_checkout_id' => $id,
+                        ]);
+                    }
                 }
             }
 
@@ -213,6 +264,7 @@ class WaveCheckoutController extends Controller
                 $transId     = $payload['transaction_id'] ?? null;
                 $clientRef   = $payload['client_reference'] ?? null;
 
+                // Donations (liées via paytransaction = sessionId)
                 if ($sessionId) {
                     $donation = Donation::where('paytransaction', $sessionId)->first();
                     if ($donation && $transId) {
@@ -220,16 +272,21 @@ class WaveCheckoutController extends Controller
                     }
                 }
 
+                // Messes (liées via wave_reference = clientRef)
                 if ($clientRef && str_starts_with($clientRef, 'messe-')) {
-                    $mess = Mess::where('request_status', 'pending')
-                        ->latest()
-                        ->first();
+                    $mess = Mess::where('wave_reference', $clientRef)->first();
                     if ($mess) {
-                        $mess->update(['request_status' => 'accepted']);
+                        $mess->update([
+                            'request_status'   => 'accepted',
+                            'payment_status'   => 'succeeded',
+                            'wave_checkout_id' => $sessionId,
+                        ]);
+                    } else {
+                        Log::warning('Wave webhook: messe introuvable pour clientRef', ['ref' => $clientRef]);
                     }
                 }
 
-                // Confirmer l'inscription à un événement payant
+                // Événements payants (liés via payment_reference = clientRef)
                 if ($clientRef && str_starts_with($clientRef, 'event-')) {
                     $participant = ParticipantEvent::where('payment_reference', $clientRef)->first();
                     if ($participant) {
@@ -242,9 +299,19 @@ class WaveCheckoutController extends Controller
                 break;
 
             case 'checkout.session.payment_failed':
-                // Marquer l'inscription comme échouée
                 $clientRef = $payload['client_reference'] ?? null;
                 Log::info('Wave: paiement échoué', ['data' => $payload]);
+
+                if ($clientRef && str_starts_with($clientRef, 'messe-')) {
+                    $mess = Mess::where('wave_reference', $clientRef)->first();
+                    if ($mess) {
+                        $mess->update([
+                            'request_status' => 'canceled',
+                            'payment_status' => 'failed',
+                        ]);
+                    }
+                }
+
                 if ($clientRef && str_starts_with($clientRef, 'event-')) {
                     $participant = ParticipantEvent::where('payment_reference', $clientRef)->first();
                     if ($participant) {
