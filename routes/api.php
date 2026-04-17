@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\MediationController;
 use App\Http\Controllers\Api\ProgrammationController;
 use App\Http\Controllers\Api\ParticipantEventController;
 use App\Http\Controllers\Api\WaveCheckoutController;
+use App\Http\Controllers\Api\OrganisationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -85,6 +86,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('time-slots', TimeSlotController::class);
 
     Route::apiResource('participants', ParticipantEventController::class);
+
+    // Organisations — gestion admin (list/show/update/destroy)
+    Route::apiResource('organisations', OrganisationController::class)->except('store');
 });
 
 // PUBLIC ROUTES (accessible sans authentification)
@@ -100,6 +104,9 @@ Route::apiResource('services', ServiceController::class)->only('index');
 Route::apiResource('participants', ParticipantEventController::class)->only('store');
 Route::apiResource('listens', ListenController::class)->only('store');
 Route::apiResource('mediations', MediationController::class)->only('index', 'show');
+
+// Soumission publique d'une demande d'organisation
+Route::apiResource('organisations', OrganisationController::class)->only('store');
 
 // WAVE PAYMENT (PUBLIC - les paroissiens doivent pouvoir payer sans auth admin)
 Route::prefix('wave')->group(function () {

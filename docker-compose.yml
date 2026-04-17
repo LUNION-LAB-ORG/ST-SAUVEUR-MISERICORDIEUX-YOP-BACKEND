@@ -1,0 +1,42 @@
+services:
+  app:
+    image: php:8.2-cli
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - APP_URL=http://localhost:8000
+    command: >
+      sh -c "apt-get update -q &&
+             apt-get install -y -q libpng-dev libzip-dev libonig-dev curl unzip &&
+             docker-php-ext-install pdo pdo_mysql zip mbstring gd &&
+             curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer &&
+             composer install --no-interaction --prefer-dist &&
+             php artisan migrate --force &&
+             php artisan storage:link &&
+             php artisan serve --host=0.0.0.0 --port=8000"
+    networks:
+      - saint-sauveur
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE: st_sauveur_staging
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - saint-sauveur
+
+networks:
+  saint-sauveur:
+    driver: bridge
+
+volumes:
+  db_data:

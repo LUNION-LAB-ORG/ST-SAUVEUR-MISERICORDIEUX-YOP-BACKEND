@@ -41,8 +41,14 @@ class Listen extends Model
 
 	protected $guarded = [];
 
-	public function time_slot()
+	public function timeSlot()
 	{
 		return $this->belongsTo(TimeSlot::class);
+	}
+
+	// Alias snake_case pour rétrocompatibilité
+	public function time_slot()
+	{
+		return $this->timeSlot();
 	}
 }
