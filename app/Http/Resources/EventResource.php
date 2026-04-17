@@ -14,7 +14,7 @@ class EventResource extends JsonResource
             'description'            => $this->description,
             'date_at'                => $this->date_at,
             'time_at'                => $this->time_at,
-            'image'                  => env('APP_URL') . '/' . $this->image,
+            'image'                  => $this->image ? env('APP_URL') . '/' . $this->image : null,
             'location_at'            => $this->location_at,
             'is_paid'                => (bool) $this->is_paid,
             'price'                  => $this->price,
