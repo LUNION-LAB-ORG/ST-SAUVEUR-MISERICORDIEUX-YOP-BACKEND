@@ -13,8 +13,8 @@ use Illuminate\Support\Facades\Hash;
  * connexion au dashboard sur un VPS vierge.
  *
  * Configurable via les variables d'environnement :
- *   - ADMIN_EMAIL      (def: admin@saintsauveur.local)
- *   - ADMIN_PASSWORD   (def: ChangeMe!2026  → À CHANGER IMMÉDIATEMENT en prod)
+ *   - ADMIN_EMAIL      (def: admin@stsauveur.com)
+ *   - ADMIN_PASSWORD   (def: password123  → À CHANGER IMMÉDIATEMENT en prod)
  *   - ADMIN_FULLNAME   (def: Administrateur)
  *   - ADMIN_PHONE      (def: null)
  *
@@ -24,8 +24,8 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $email    = env('ADMIN_EMAIL', 'admin@saintsauveur.local');
-        $password = env('ADMIN_PASSWORD', 'ChangeMe!2026');
+        $email    = env('ADMIN_EMAIL', 'admin@stsauveur.com');
+        $password = env('ADMIN_PASSWORD', 'password123');
         $fullname = env('ADMIN_FULLNAME', 'Administrateur');
         $phone    = env('ADMIN_PHONE');
 
@@ -41,7 +41,7 @@ class AdminUserSeeder extends Seeder
         );
 
         $this->command?->info("Compte admin prêt : {$email}");
-        if ($password === 'ChangeMe!2026') {
+        if ($password === 'password123') {
             $this->command?->warn('⚠  Mot de passe par défaut utilisé. À changer immédiatement via le dashboard.');
         }
     }
