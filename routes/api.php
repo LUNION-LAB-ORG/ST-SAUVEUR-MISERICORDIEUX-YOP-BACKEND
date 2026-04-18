@@ -48,6 +48,9 @@ Route::prefix('auth')->group(function () {
 // });
 
 
+// PUBLIC : prochaines occurrences disponibles de slots (calculées) — DOIT être avant apiResource
+Route::get('/time-slots/available', [\App\Http\Controllers\Api\TimeSlotController::class, 'available']);
+
 /*
 |--------------------------------------------------------------------------
 | API Routes (Protected)

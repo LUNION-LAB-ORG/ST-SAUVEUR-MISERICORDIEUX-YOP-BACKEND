@@ -68,7 +68,15 @@ class MesseController extends Controller
      */
     public function store(StoreRequest $request)
     {
-        $messe = $this->repo->create($request->validated());
+        $data = $request->validated();
+
+        // Validation : la date + heure doivent correspondre à un slot 'messe' actif
+        $error = self::ensureSlotMatch($data['date_at'] ?? null, $data['time_at'] ?? null, 'messe');
+        if ($error) {
+            return response()->json(['error' => $error], 422);
+        }
+
+        $messe = $this->repo->create($data);
 
         // Notification admin
         try { \App\Services\NotificationService::forMesse($messe); } catch (\Throwable $e) {}
@@ -76,6 +84,40 @@ class MesseController extends Controller
         return (new MessResource($messe))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
+    }
+
+    /**
+     * Vérifie que la date+heure choisies correspondent à un slot configuré actif.
+     * Renvoie une string d'erreur si invalide, null si OK.
+     */
+    private static function ensureSlotMatch(?string $dateAt, ?string $timeAt, string $type): ?string
+    {
+        if (!$dateAt || !$timeAt) return null;
+
+        try {
+            $date = \Carbon\Carbon::parse($dateAt);
+        } catch (\Throwable $e) {
+            return "Date invalide.";
+        }
+        $weekday = (int) $date->dayOfWeek; // 0 = dimanche
+        // Extraire HH:MM de time_at (peut être "09:00" ou "09:00:00" ou ISO)
+        $hm = '00:00';
+        if (preg_match('/^(\d{2}):(\d{2})/', $timeAt, $m)) {
+            $hm = $m[1] . ':' . $m[2];
+        } else {
+            try { $hm = \Carbon\Carbon::parse($timeAt)->format('H:i'); } catch (\Throwable $e) {}
+        }
+
+        $exists = \App\Models\TimeSlot::where('type', $type)
+            ->where('weekday', $weekday)
+            ->where('is_available', true)
+            ->where('start_time', 'LIKE', $hm . '%')
+            ->exists();
+
+        if (!$exists) {
+            return "Ce créneau n'est pas disponible. Veuillez choisir parmi les horaires proposés.";
+        }
+        return null;
     }
 
     /**

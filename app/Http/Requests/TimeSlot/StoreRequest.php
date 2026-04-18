@@ -14,10 +14,13 @@ class StoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'priest_id'   => 'required|integer|exists:users,id',
+            'type'        => 'required|string|in:messe,ecoute,confession,adoration,autre',
+            'priest_id'   => 'nullable|integer|exists:users,id',
             'weekday'     => 'required|integer|min:0|max:6',
-            'start_time'  => 'required',
-            'end_time'    => 'required',
+            'start_time'  => 'required|string',
+            'end_time'    => 'required|string',
+            'capacity'    => 'nullable|integer|min:1',
+            'notes'       => 'nullable|string|max:255',
             'is_available'=> 'nullable|boolean',
         ];
     }

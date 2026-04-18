@@ -68,7 +68,31 @@ class ListenController extends Controller
      */
     public function store(StoreRequest $request)
     {
-        $listen = $this->repo->create($request->validated());
+        $data = $request->validated();
+
+        // Validation : si un time_slot_id est fourni, il doit pointer un slot actif de type 'ecoute'
+        if (!empty($data['time_slot_id'])) {
+            $slot = \App\Models\TimeSlot::find($data['time_slot_id']);
+            if (!$slot || $slot->type !== 'ecoute' || !$slot->is_available) {
+                return response()->json([
+                    'error' => "Ce créneau d'écoute n'est plus disponible.",
+                ], 422);
+            }
+            // Si capacité définie, vérifier qu'on n'a pas dépassé sur la date demandée
+            if ($slot->capacity && !empty($data['listen_at'])) {
+                $taken = \App\Models\Listen::where('time_slot_id', $slot->id)
+                    ->whereDate('listen_at', $data['listen_at'])
+                    ->whereIn('request_status', ['pending', 'accepted'])
+                    ->count();
+                if ($taken >= $slot->capacity) {
+                    return response()->json([
+                        'error' => "Ce créneau est complet à cette date.",
+                    ], 422);
+                }
+            }
+        }
+
+        $listen = $this->repo->create($data);
 
         try { \App\Services\NotificationService::forListen($listen); } catch (\Throwable $e) {}
 

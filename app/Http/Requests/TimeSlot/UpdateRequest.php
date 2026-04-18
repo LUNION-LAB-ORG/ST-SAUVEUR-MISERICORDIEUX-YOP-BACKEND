@@ -14,11 +14,14 @@ class UpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'priest_id'   => 'sometimes|integer|exists:users,id',
+            'type'        => 'sometimes|string|in:messe,ecoute,confession,adoration,autre',
+            'priest_id'   => 'sometimes|nullable|integer|exists:users,id',
             'weekday'     => 'sometimes|integer|min:0|max:6',
-            'start_time'  => 'sometimes',
-            'end_time'    => 'sometimes',
-            'is_available'=> 'nullable|boolean',
+            'start_time'  => 'sometimes|string',
+            'end_time'    => 'sometimes|string',
+            'capacity'    => 'sometimes|nullable|integer|min:1',
+            'notes'       => 'sometimes|nullable|string|max:255',
+            'is_available'=> 'sometimes|nullable|boolean',
         ];
     }
 }
