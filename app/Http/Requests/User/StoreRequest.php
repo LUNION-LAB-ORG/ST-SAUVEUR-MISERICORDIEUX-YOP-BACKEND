@@ -18,9 +18,10 @@ class StoreRequest extends FormRequest
             'email'              => 'nullable|email|max:100|unique:users,email,' . $this->id,
             'phone'              => 'required|string|max:100|unique:users,phone,' . $this->id,
             'password'           => ($this->id ? 'nullable' : 'required') . '|string|min:6',
-            'status'             => 'required|in:ENABLE,DISABLE',
-            'photo'              => 'nullable|string|max:255',
-            'role'               => 'nullable|in:ADMIN,PRIEST',
+            'status'             => 'sometimes|in:active,inactive',
+            // Accepte aussi photo en upload (handled in controller)
+            'photo'              => 'nullable',
+            'role'               => 'nullable|in:admin,priest',
             'email_verified_at'  => 'nullable|date',
         ];
     }

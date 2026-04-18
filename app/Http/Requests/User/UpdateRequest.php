@@ -15,13 +15,13 @@ class UpdateRequest extends FormRequest
     {
         return [
             'fullname'           => 'sometimes|string|max:255',
-            'email'              => 'nullable|email|max:100|unique:users,email,' . $this->id,
+            'email'              => 'sometimes|nullable|email|max:100|unique:users,email,' . $this->id,
             'phone'              => 'sometimes|string|max:100|unique:users,phone,' . $this->id,
-            'password'           => ($this->id ? 'nullable' : 'sometimes') . '|string|min:6',
-            'status'             => 'sometimes|in:ENABLE,DISABLE',
-            'photo'              => 'nullable|string|max:255',
-            'role'               => 'nullable|in:ADMIN,PRIEST',
-            'email_verified_at'  => 'nullable|date',
+            'password'           => 'sometimes|nullable|string|min:6',
+            'status'             => 'sometimes|in:active,inactive',
+            'photo'              => 'sometimes|nullable',
+            'role'               => 'sometimes|nullable|in:admin,priest',
+            'email_verified_at'  => 'sometimes|nullable|date',
         ];
     }
 }

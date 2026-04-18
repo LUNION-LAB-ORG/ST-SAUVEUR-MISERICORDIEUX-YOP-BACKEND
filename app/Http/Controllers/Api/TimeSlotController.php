@@ -37,7 +37,7 @@ class TimeSlotController extends Controller
         if ($request->filled('is_available')) $conditions[] = ['is_available', '=', $request->is_available];
 
         $timeSlots = $this->repo->paginate(
-            with: ['priest'],
+            with: [],
             page: (int) $request->input('per_page', 100),
             conditions: $conditions,
             skip: (int) $request->input('skip', 0),
@@ -128,7 +128,7 @@ class TimeSlotController extends Controller
 
     public function show(string $id)
     {
-        return new TimeSlotResource($this->repo->find($id, ['priest']));
+        return new TimeSlotResource($this->repo->find($id));
     }
 
     public function update(UpdateRequest $request, string $id)
