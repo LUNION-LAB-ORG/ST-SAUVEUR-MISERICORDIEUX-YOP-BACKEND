@@ -27,10 +27,11 @@ class WaveCheckoutController extends Controller
             'donator'          => 'nullable|string|max:255',
             'project'          => 'nullable|string|max:255',
             'description'      => 'nullable|string',
-            // Champs spécifiques messe
-            'mess_type'        => 'nullable|string|max:100',
+            // Coordonnées donateur (don)
             'email'            => 'nullable|email|max:255',
             'phone'            => 'nullable|string|max:30',
+            // Champs spécifiques messe
+            'mess_type'        => 'nullable|string|max:100',
             'date_at'          => 'nullable|date',
             'time_at'          => 'nullable',
             // Champs spécifiques event
@@ -87,16 +88,21 @@ class WaveCheckoutController extends Controller
 
             $session = $response->json();
 
-            // Enregistrer en base avec statut "processing"
+            // Enregistrer en base avec statut "pending" (passera à "succeeded"
+            // au webhook Wave checkout.session.completed, ou via checkStatus).
             if ($request->type === 'donation') {
                 Donation::create([
-                    'donator'       => $request->donator ?? 'Anonyme',
-                    'amount'        => $request->amount,
-                    'project'       => $request->project ?? 'Fonctionnement',
-                    'paymethod'     => 'wave',
-                    'paytransaction'=> $session['id'] ?? null,
-                    'description'   => $request->description ?? 'Don via Wave',
-                    'donation_at'   => now(),
+                    'donator'        => $request->donator ?? 'Anonyme',
+                    'email'          => $request->email,
+                    'phone'          => $request->phone,
+                    'donation_type'  => 'monetaire',
+                    'amount'         => $request->amount,
+                    'project'        => $request->project ?? 'Fonctionnement',
+                    'paymethod'      => 'wave',
+                    'paytransaction' => $session['id'] ?? null,
+                    'payment_status' => 'pending',
+                    'description'    => $request->description,
+                    'donation_at'    => now(),
                 ]);
             } elseif ($request->type === 'messe') {
                 // Parser date_at / time_at envoyés par le frontend
@@ -173,10 +179,12 @@ class WaveCheckoutController extends Controller
             // Mettre à jour le don si paiement réussi
             if (($session['payment_status'] ?? '') === 'succeeded') {
                 $donation = Donation::where('paytransaction', $id)->first();
-                if ($donation) {
+                if ($donation && $donation->payment_status !== 'succeeded') {
                     $donation->update([
                         'paytransaction' => $session['transaction_id'] ?? $id,
+                        'payment_status' => 'succeeded',
                     ]);
+                    try { \App\Services\NotificationService::forDonation($donation->fresh()); } catch (\Throwable $e) {}
                 }
 
                 // Fallback messe (si webhook pas encore reçu)
@@ -267,8 +275,12 @@ class WaveCheckoutController extends Controller
                 // Donations (liées via paytransaction = sessionId)
                 if ($sessionId) {
                     $donation = Donation::where('paytransaction', $sessionId)->first();
-                    if ($donation && $transId) {
-                        $donation->update(['paytransaction' => $transId]);
+                    if ($donation) {
+                        $donation->update([
+                            'paytransaction' => $transId ?: $sessionId,
+                            'payment_status' => 'succeeded',
+                        ]);
+                        try { \App\Services\NotificationService::forDonation($donation->fresh()); } catch (\Throwable $e) {}
                     }
                 }
 
@@ -299,8 +311,17 @@ class WaveCheckoutController extends Controller
                 break;
 
             case 'checkout.session.payment_failed':
+                $sessionId = $payload['id'] ?? null;
                 $clientRef = $payload['client_reference'] ?? null;
                 Log::info('Wave: paiement échoué', ['data' => $payload]);
+
+                // Donations : marquer payment_status='failed' pour ne pas polluer
+                if ($sessionId) {
+                    $donation = Donation::where('paytransaction', $sessionId)->first();
+                    if ($donation && $donation->payment_status !== 'succeeded') {
+                        $donation->update(['payment_status' => 'failed']);
+                    }
+                }
 
                 if ($clientRef && str_starts_with($clientRef, 'messe-')) {
                     $mess = Mess::where('wave_reference', $clientRef)->first();

@@ -58,7 +58,7 @@ class ParticipantEventController extends Controller
      */
     public function register(Request $request, string $id): JsonResponse
     {
-        $event = Event::withCount('participants')->findOrFail($id);
+        $event = Event::findOrFail($id);
 
         $request->validate([
             'fullname'   => 'required|string|max:255',
@@ -75,11 +75,29 @@ class ParticipantEventController extends Controller
             ], 422);
         }
 
-        // Vérifier les places disponibles
-        if ($event->max_participants !== null && $event->participants_count >= $event->max_participants) {
-            return response()->json([
-                'error' => 'Cet événement est complet.',
-            ], 422);
+        // Comptage des places réellement occupées :
+        // - succeeded / paid / free : inscription confirmée
+        // - pending récents (< 1h) : paiement en cours, la place est réservée
+        //   pour l'utilisateur qui est parti chez Wave
+        // - pending > 1h : considéré abandonné, la place se libère automatiquement
+        $activeCountFilter = function ($q) {
+            $q->whereIn('payment_status', ['succeeded', 'paid', 'free'])
+              ->orWhere(function ($q2) {
+                  $q2->where('payment_status', 'pending')
+                     ->where('created_at', '>', now()->subHour());
+              });
+        };
+
+        // Vérifier les places globales disponibles
+        if ($event->max_participants !== null) {
+            $activeCount = ParticipantEvent::where('event_id', $event->id)
+                ->where($activeCountFilter)
+                ->count();
+            if ($activeCount >= $event->max_participants) {
+                return response()->json([
+                    'error' => 'Cet événement est complet.',
+                ], 422);
+            }
         }
 
         // Événement GRATUIT → inscription directe
@@ -132,11 +150,13 @@ class ParticipantEventController extends Controller
             $amount = (float) ($selectedTier['amount'] ?? 0);
 
             // Vérifier capacité par tier si max_participants défini
+            // Même logique que le count global : on n'inclut les pending que s'ils
+            // ont moins d'1h (au-delà, considérés comme abandonnés → place libre).
             $tierMax = $selectedTier['max_participants'] ?? null;
             if ($tierMax !== null && (int) $tierMax > 0) {
                 $tierTaken = ParticipantEvent::where('event_id', $event->id)
                     ->where('tier_label', $tierLabel)
-                    ->whereIn('payment_status', ['succeeded', 'pending', 'paid'])
+                    ->where($activeCountFilter)
                     ->count();
                 if ($tierTaken >= (int) $tierMax) {
                     return response()->json([

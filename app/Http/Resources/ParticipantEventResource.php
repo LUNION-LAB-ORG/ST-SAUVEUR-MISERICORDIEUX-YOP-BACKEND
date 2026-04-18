@@ -21,6 +21,7 @@ class ParticipantEventResource extends JsonResource
             'wave_checkout_id'  => $this->wave_checkout_id,
             'payment_reference' => $this->payment_reference,
             'amount'            => $this->amount,
+            'tier_label'        => $this->tier_label,
 
             'created_at' => optional($this->created_at)->toDateTimeString(),
         ];

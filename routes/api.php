@@ -119,6 +119,10 @@ Route::apiResource('news', NewsController::class)->only('index', 'show');
 Route::apiResource('messes', MesseController::class)->only('store');
 Route::apiResource('events', EventController::class)->only('index', 'show');
 
+// Soumission publique d'un don "paroisse" (paiement en espèces)
+// Les dons Wave passent par /wave/checkout
+Route::post('/donations/public', [DonationController::class, 'publicStore']);
+
 // Inscription publique à un événement (gratuit ou paiement Wave)
 Route::post('/events/{id}/register', [ParticipantEventController::class, 'register']);
 Route::apiResource('pastors', PastorController::class)->only('index', 'show');
