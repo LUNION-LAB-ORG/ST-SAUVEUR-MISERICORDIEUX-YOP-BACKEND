@@ -57,7 +57,11 @@ Route::get('/time-slots/available', [\App\Http\Controllers\Api\TimeSlotControlle
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth:sanctum')->group(function () {
-    // Users
+    // Profil utilisateur connecté
+    Route::get('/me', [UserController::class, 'me']);
+    Route::post('/me', [UserController::class, 'updateMe']); // POST avec _method=PUT pour multipart
+
+    // Users (admin)
     Route::apiResource('users', UserController::class);
 
     // Donations

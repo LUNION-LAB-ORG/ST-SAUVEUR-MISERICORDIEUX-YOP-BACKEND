@@ -9,6 +9,7 @@ use App\Http\Resources\UserResource;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
@@ -70,6 +71,12 @@ class UserController extends Controller
             $data['password'] = bcrypt($data['password']);
         }
 
+        // Upload photo
+        if ($request->hasFile('photo')) {
+            $path = $request->file('photo')->store('users', 'public');
+            $data['photo'] = 'storage/' . $path;
+        }
+
         $user = $this->repo->create($data);
 
         return (new UserResource($user))
@@ -92,13 +99,80 @@ class UserController extends Controller
     {
         $data = $request->validated();
 
-        // Hash password if present
-        if (isset($data['password'])) {
+        // Hash password if present (et non vide)
+        if (!empty($data['password'])) {
             $data['password'] = bcrypt($data['password']);
+        } else {
+            unset($data['password']);
+        }
+
+        $existing = $this->repo->find($id);
+
+        // Upload photo
+        if ($request->hasFile('photo')) {
+            if ($existing && $existing->photo) {
+                $old = preg_replace('#^storage/#', '', $existing->photo);
+                if (Storage::disk('public')->exists($old)) {
+                    Storage::disk('public')->delete($old);
+                }
+            }
+            $path = $request->file('photo')->store('users', 'public');
+            $data['photo'] = 'storage/' . $path;
         }
 
         $user = $this->repo->update($id, $data);
         return new UserResource($user);
+    }
+
+    /**
+     * Endpoint /me — récupère le profil de l'utilisateur connecté
+     */
+    public function me(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['error' => 'Non authentifié'], 401);
+        }
+        return response()->json(['data' => new UserResource($user)]);
+    }
+
+    /**
+     * Endpoint PUT /me — met à jour le profil de l'utilisateur connecté
+     */
+    public function updateMe(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['error' => 'Non authentifié'], 401);
+        }
+
+        $data = $request->validate([
+            'fullname' => 'sometimes|string|max:255',
+            'email'    => 'sometimes|nullable|email|max:100|unique:users,email,' . $user->id,
+            'phone'    => 'sometimes|string|max:100|unique:users,phone,' . $user->id,
+            'password' => 'sometimes|nullable|string|min:6',
+            'photo'    => 'sometimes|nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+        ]);
+
+        if (!empty($data['password'])) {
+            $data['password'] = bcrypt($data['password']);
+        } else {
+            unset($data['password']);
+        }
+
+        if ($request->hasFile('photo')) {
+            if ($user->photo) {
+                $old = preg_replace('#^storage/#', '', $user->photo);
+                if (Storage::disk('public')->exists($old)) {
+                    Storage::disk('public')->delete($old);
+                }
+            }
+            $path = $request->file('photo')->store('users', 'public');
+            $data['photo'] = 'storage/' . $path;
+        }
+
+        $user->update($data);
+        return response()->json(['data' => new UserResource($user->fresh())]);
     }
 
     /**
