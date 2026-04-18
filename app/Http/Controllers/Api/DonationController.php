@@ -24,6 +24,17 @@ class DonationController extends Controller
      */
     public function index(Request $request)
     {
+        // Auto-expiration défensive : les dons Wave restés en "pending" depuis
+        // plus d'1h sans webhook de confirmation/échec sont considérés comme
+        // abandonnés et marqués "failed". Évite qu'ils polluent les stats ou
+        // qu'ils s'affichent comme "à valider" indéfiniment si Wave ne
+        // renvoie pas d'event expired.
+        \App\Models\Donation::query()
+            ->where('payment_status', 'pending')
+            ->where('paymethod', 'wave')
+            ->where('created_at', '<', now()->subHour())
+            ->update(['payment_status' => 'failed']);
+
         $conditions = [];
 
         // Filters

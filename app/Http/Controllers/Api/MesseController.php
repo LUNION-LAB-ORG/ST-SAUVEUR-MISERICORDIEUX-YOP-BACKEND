@@ -24,6 +24,18 @@ class MesseController extends Controller
      */
     public function index(Request $request)
     {
+        // Auto-expiration défensive : les demandes de messe Wave restées en
+        // "pending" depuis plus d'1h sans webhook de confirmation sont
+        // considérées comme abandonnées et marquées "failed" + "canceled".
+        \App\Models\Mess::query()
+            ->where('payment_status', 'pending')
+            ->whereNotNull('wave_checkout_id')
+            ->where('created_at', '<', now()->subHour())
+            ->update([
+                'payment_status' => 'failed',
+                'request_status' => 'canceled',
+            ]);
+
         $conditions = [];
 
         // Filters

@@ -26,6 +26,16 @@ class ParticipantEventController extends Controller
 
     public function index(Request $request)
     {
+        // Auto-expiration défensive : les inscriptions Wave restées en "pending"
+        // depuis plus d'1h sans webhook de confirmation sont considérées comme
+        // abandonnées et marquées "failed". Évite qu'elles bloquent les places
+        // indéfiniment et qu'elles polluent le décompte des inscrits.
+        ParticipantEvent::query()
+            ->where('payment_status', 'pending')
+            ->whereNotNull('wave_checkout_id')
+            ->where('created_at', '<', now()->subHour())
+            ->update(['payment_status' => 'failed']);
+
         $conditions = [];
 
         if ($request->filled('fullname')) {

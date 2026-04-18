@@ -311,11 +311,15 @@ class WaveCheckoutController extends Controller
                 break;
 
             case 'checkout.session.payment_failed':
+            case 'checkout.session.expired':
+                // Wave envoie `expired` quand l'utilisateur abandonne sans valider
+                // et que la session arrive à expiration (30 min par défaut).
+                // On traite ces deux cas de la même façon : marquer comme failed.
                 $sessionId = $payload['id'] ?? null;
                 $clientRef = $payload['client_reference'] ?? null;
-                Log::info('Wave: paiement échoué', ['data' => $payload]);
+                Log::info('Wave: paiement non abouti', ['event' => $event, 'data' => $payload]);
 
-                // Donations : marquer payment_status='failed' pour ne pas polluer
+                // Donations : marquer payment_status='failed' pour ne pas polluer les stats
                 if ($sessionId) {
                     $donation = Donation::where('paytransaction', $sessionId)->first();
                     if ($donation && $donation->payment_status !== 'succeeded') {
@@ -325,7 +329,7 @@ class WaveCheckoutController extends Controller
 
                 if ($clientRef && str_starts_with($clientRef, 'messe-')) {
                     $mess = Mess::where('wave_reference', $clientRef)->first();
-                    if ($mess) {
+                    if ($mess && $mess->payment_status !== 'succeeded') {
                         $mess->update([
                             'request_status' => 'canceled',
                             'payment_status' => 'failed',
@@ -335,7 +339,7 @@ class WaveCheckoutController extends Controller
 
                 if ($clientRef && str_starts_with($clientRef, 'event-')) {
                     $participant = ParticipantEvent::where('payment_reference', $clientRef)->first();
-                    if ($participant) {
+                    if ($participant && $participant->payment_status !== 'succeeded') {
                         $participant->update(['payment_status' => 'failed']);
                     }
                 }
