@@ -20,23 +20,11 @@ jobs:
         php-version: '8.2'
         extensions: mbstring, bcmath, pdo_sqlite
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-
     - name: Copy .env
       run: php -r "file_exists('.env') || copy('.env.example', '.env');"
 
     - name: Install PHP Dependencies
       run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
-
-    - name: Install Node Dependencies
-      run: npm ci
-
-    - name: Build assets
-      run: npm run build
 
     - name: Generate key
       run: php artisan key:generate
