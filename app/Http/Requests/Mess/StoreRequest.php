@@ -20,7 +20,7 @@ class StoreRequest extends FormRequest
             'phone'           => 'required|string|max:60',
             'message'         => 'nullable|string',
             'request_status'  => 'required|in:pending,accepted,canceled',
-            'payment_status'  => 'sometimes|nullable|in:pending,succeeded,failed',
+            'payment_status'  => 'sometimes|nullable|in:pending,succeeded,failed,to_pay',
             'amount'          => 'required|numeric|min:0',
             'date_at'         => 'required|date',
             'time_at'         => 'required',

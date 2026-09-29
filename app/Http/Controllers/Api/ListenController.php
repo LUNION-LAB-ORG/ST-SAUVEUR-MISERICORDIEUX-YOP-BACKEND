@@ -52,7 +52,7 @@ class ListenController extends Controller
         }
 
         $listens = $this->repo->paginate(
-            with: ['timeSlot'],
+            with: ['timeSlot', 'priest'],
             page: (int) $request->input('per_page', 15),
             conditions: $conditions,
             skip: (int) $request->input('skip', 0),
@@ -106,7 +106,7 @@ class ListenController extends Controller
      */
     public function show(string $id)
     {
-        return new ListenResource($this->repo->find($id, ['timeSlot']));
+        return new ListenResource($this->repo->find($id, ['timeSlot', 'priest']));
     }
 
     /**

@@ -36,6 +36,7 @@ class Listen extends Model
 
 	protected $casts = [
 		'time_slot_id' => 'int',
+		'priest_id' => 'int',
 		'listen_at' => 'datetime'
 	];
 
@@ -44,6 +45,12 @@ class Listen extends Model
 	public function timeSlot()
 	{
 		return $this->belongsTo(TimeSlot::class);
+	}
+
+	/** Prêtre choisi pour le rendez-vous (conservé même s'il a été archivé). */
+	public function priest()
+	{
+		return $this->belongsTo(Priest::class)->withTrashed();
 	}
 
 	// Alias snake_case pour rétrocompatibilité

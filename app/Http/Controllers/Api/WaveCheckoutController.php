@@ -7,12 +7,14 @@ use App\Models\Donation;
 use App\Models\Mess;
 use App\Models\ParticipantEvent;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
+use App\Services\WaveCheckoutService;
 use Illuminate\Support\Facades\Log;
 
 class WaveCheckoutController extends Controller
 {
-    private string $baseUrl = 'https://api.wave.com';
+    public function __construct(protected WaveCheckoutService $wave)
+    {
+    }
 
     /**
      * Créer une session de paiement Wave
@@ -40,15 +42,13 @@ class WaveCheckoutController extends Controller
             'event_id'         => 'nullable|integer',
         ]);
 
-        $apiKey = config('services.wave.api_key');
-
-        if (!$apiKey) {
+        if (!$this->wave->isConfigured()) {
             return response()->json([
                 'error' => 'Configuration Wave manquante. Contactez l\'administrateur.',
             ], 500);
         }
 
-        $frontendUrl = config('services.wave.frontend_url', 'https://paroisse-st-sauveur-mis-ricordieux.vercel.app');
+        $frontendUrl = $this->wave->frontendUrl();
         $clientRef   = $request->client_reference ?? ($request->type . '-' . now()->timestamp);
 
         // URLs de retour selon le type de paiement
@@ -65,16 +65,7 @@ class WaveCheckoutController extends Controller
         }
 
         try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type'  => 'application/json',
-            ])->post($this->baseUrl . '/v1/checkout/sessions', [
-                'amount'           => strval(intval($request->amount)),
-                'currency'         => 'XOF',
-                'success_url'      => $successUrl,
-                'error_url'        => $errorUrl,
-                'client_reference' => $clientRef,
-            ]);
+            $response = $this->wave->createSession($request->amount, $clientRef, $successUrl, $errorUrl);
 
             if ($response->failed()) {
                 Log::error('Wave Checkout Error', [
@@ -162,16 +153,12 @@ class WaveCheckoutController extends Controller
      */
     public function checkStatus(string $id)
     {
-        $apiKey = config('services.wave.api_key');
-
-        if (!$apiKey) {
+        if (!$this->wave->isConfigured()) {
             return response()->json(['error' => 'Configuration Wave manquante.'], 500);
         }
 
         try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
-            ])->get($this->baseUrl . '/v1/checkout/sessions/' . $id);
+            $response = $this->wave->getSession($id);
 
             if ($response->failed()) {
                 return response()->json(['error' => 'Session introuvable.'], 404);
@@ -201,6 +188,11 @@ class WaveCheckoutController extends Controller
                             'wave_checkout_id' => $id,
                         ]);
                     }
+                }
+
+                // Fallback demande de messe en ligne (client_reference = numéro SSM-AAAA-NNNN)
+                if (WaveCheckoutService::isMassRequestReference($clientRef)) {
+                    $this->wave->markMassRequestPaid($clientRef, $id);
                 }
 
                 // Fallback événement payant (si webhook pas encore reçu)
@@ -301,6 +293,11 @@ class WaveCheckoutController extends Controller
                     }
                 }
 
+                // Demandes de messe en ligne (client_reference = numéro SSM-AAAA-NNNN)
+                if (WaveCheckoutService::isMassRequestReference($clientRef)) {
+                    $this->wave->markMassRequestPaid($clientRef, $sessionId);
+                }
+
                 // Événements payants (liés via payment_reference = clientRef)
                 if ($clientRef && str_starts_with($clientRef, 'event-')) {
                     $participant = ParticipantEvent::where('payment_reference', $clientRef)->first();
@@ -338,6 +335,10 @@ class WaveCheckoutController extends Controller
                             'payment_status' => 'failed',
                         ]);
                     }
+                }
+
+                if (WaveCheckoutService::isMassRequestReference($clientRef)) {
+                    $this->wave->markMassRequestFailed($clientRef);
                 }
 
                 if ($clientRef && str_starts_with($clientRef, 'event-')) {

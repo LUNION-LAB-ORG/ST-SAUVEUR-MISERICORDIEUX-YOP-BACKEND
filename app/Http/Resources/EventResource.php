@@ -11,6 +11,13 @@ class EventResource extends JsonResource
         return [
             'id'                     => $this->id,
             'title'                  => $this->title,
+            'slug'                   => $this->slug,
+            'summary'                => $this->summary,
+            'category'               => $this->category,
+            'audience'               => $this->audience,
+            'end_time'               => \App\Models\Event::hhmm($this->getRawOriginal('end_time') ?? $this->end_time),
+            'programme'              => array_values($this->programme ?? []),
+            'status'                 => $this->status ?? 'published',
             'description'            => $this->description,
             'date_at'                => $this->date_at,
             'time_at'                => $this->time_at,

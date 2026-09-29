@@ -4,9 +4,12 @@ namespace Database\Seeders;
 
 use App\Models\Announcement;
 use App\Models\ChurchProject;
+use App\Models\Council;
+use App\Models\Event;
 use App\Models\HistoryMilestone;
 use App\Models\Homily;
 use App\Models\Priest;
+use App\Models\Publication;
 use App\Models\ScheduleException;
 use App\Models\Service;
 use App\Models\Setting;
@@ -33,8 +36,14 @@ class DemoAccueilSeeder extends Seeder
         $this->mouvements();
         $this->projetEglise();
         $this->jalons();
-        $this->annonce();
+        $this->annonces();
         $this->parametres();
+
+        // Sous-pages (lot 2)
+        $this->capaciteMesses();
+        $this->evenements();
+        $this->publications();
+        $this->conseils();
     }
 
     /** Horaires récurrents (0 = dimanche). Uniquement si aucun créneau de célébration n'existe. */
@@ -79,6 +88,8 @@ class DemoAccueilSeeder extends Seeder
                     'label' => $libelle,
                     'location' => $lieu,
                     'is_available' => true,
+                    // Capacité d'intentions par messe (demande de messe en ligne)
+                    'capacity' => $type === 'messe' ? 10 : null,
                 ]);
             }
         }
@@ -205,20 +216,37 @@ class DemoAccueilSeeder extends Seeder
         }
     }
 
-    private function annonce(): void
+    /**
+     * Annonces de la maquette. Ajoutées une à une (par titre) tant que la base ne contient
+     * que des annonces de démonstration : aucune annonce réelle n'est jamais complétée.
+     */
+    private function annonces(): void
     {
-        if (Announcement::exists()) {
+        $annonces = [
+            ['Chantier', 'Quête spéciale pour la construction de la nouvelle église', '[Texte de l’annonce principale : date de la quête, modalités, possibilité de don en ligne par Mobile Money.]', 'Secrétariat paroissial', true],
+            ['Sacrements', 'Inscriptions au catéchisme et à la préparation aux sacrements', 'Les inscriptions pour le baptême, la première communion et la confirmation sont ouvertes au secrétariat. Munissez-vous de l’extrait de naissance et, le cas échéant, du certificat de baptême.', 'Secrétariat paroissial', false],
+            ['Sacrements', 'Préparation au mariage : prochaine session', 'Les fiancés qui souhaitent se marier dans l’année sont invités à s’inscrire au moins six mois avant la date envisagée. La session comprend quatre rencontres avec un couple accompagnateur et un prêtre.', 'Équipe de pastorale familiale', false],
+            ['Liturgie', 'Recrutement de lecteurs et de servants de messe', 'L’équipe liturgique accueille de nouveaux lecteurs et servants. Une formation est proposée le samedi après la messe du matin.', 'Équipe liturgique', false],
+            ['Vie paroissiale', 'Journée paroissiale de rentrée', 'Toute la communauté est invitée à la journée paroissiale : messe, présentation des mouvements, repas partagé et animations pour les enfants.', 'Conseil pastoral', false],
+            ['Vie paroissiale', 'Horaires du secrétariat pendant les congés', '[Horaires d’ouverture exceptionnels du secrétariat paroissial.]', 'Secrétariat paroissial', false],
+        ];
+
+        $titres = array_column($annonces, 1);
+        if (Announcement::whereNotIn('title', $titres)->exists()) {
+            $this->command?->warn('Annonces : des annonces réelles existent, ignoré.');
             return;
         }
 
-        Announcement::create([
-            'category' => 'Chantier',
-            'title' => 'Quête spéciale pour la construction de la nouvelle église',
-            'content' => '[Texte de l’annonce principale : date de la quête, modalités, possibilité de don en ligne par Mobile Money.]',
-            'contact' => 'Secrétariat paroissial',
-            'is_featured' => true,
-            'status' => 'published',
-        ]);
+        foreach ($annonces as $i => [$categorie, $titre, $contenu, $contact, $aLaUne]) {
+            Announcement::firstOrCreate(['title' => $titre], [
+                'category' => $categorie,
+                'content' => $contenu,
+                'contact' => $contact,
+                'is_featured' => $aLaUne,
+                'status' => 'published',
+                'sort_order' => $i,
+            ]);
+        }
     }
 
     /** Mot du curé : seulement si les paramètres sont vides. */
@@ -227,6 +255,8 @@ class DemoAccueilSeeder extends Seeder
         $valeurs = [
             'pastor_word.message' => 'Chers frères et sœurs en Christ, [mot d’accueil du curé].',
             'pastor_word.signature' => '[Père Prénom NOM], curé de la paroisse',
+            'mass.offering_amount' => '2000',
+            'parish.office_hours' => 'Lundi au samedi, 8 h – 12 h et 15 h – 18 h',
         ];
 
         foreach ($valeurs as $cle => $valeur) {
@@ -235,6 +265,144 @@ class DemoAccueilSeeder extends Seeder
                 $setting->value = $valeur;
                 $setting->save();
             }
+        }
+    }
+
+    /** Capacité de 10 intentions sur les créneaux « messe » créés par ce seeder (si non renseignée). */
+    private function capaciteMesses(): void
+    {
+        $libelles = [
+            'Messe matinale', 'Messe du soir', 'Messe anticipée du dimanche',
+            'Première messe dominicale', 'Deuxième messe dominicale', 'Messe des jeunes',
+        ];
+
+        TimeSlot::where('type', 'messe')
+            ->whereIn('label', $libelles)
+            ->whereNull('capacity')
+            ->update(['capacity' => 10]);
+    }
+
+    /** Agenda : événement de démonstration + 3 autres, uniquement si aucun événement à venir n'existe. */
+    private function evenements(): void
+    {
+        $aujourdhui = Carbon::today('Africa/Abidjan');
+        if (Event::whereDate('date_at', '>=', $aujourdhui->toDateString())->exists()) {
+            $this->command?->warn('Agenda : des événements à venir existent déjà, ignoré.');
+            return;
+        }
+
+        Event::create([
+            'title' => 'Messe d’ouverture de l’année pastorale et journée paroissiale',
+            'summary' => 'Une journée pour lancer ensemble la nouvelle année pastorale : messe solennelle, présentation des mouvements et repas partagé.',
+            'description' => '[Présentation détaillée de la journée : thème de l’année pastorale, invités, organisation pratique.]',
+            'category' => 'Événement paroissial',
+            'audience' => 'Toute la communauté',
+            'date_at' => $aujourdhui->copy()->addDays(10)->toDateString(),
+            'time_at' => '09:00',
+            'end_time' => '16:00',
+            'location_at' => 'Église Saint Sauveur Miséricordieux',
+            'programme' => [
+                ['time' => '09:00', 'label' => 'Messe d’ouverture présidée par le curé'],
+                ['time' => '11:00', 'label' => 'Présentation des mouvements et services'],
+                ['time' => '12:30', 'label' => 'Repas partagé'],
+                ['time' => '14:00', 'label' => 'Animations pour les enfants et les jeunes'],
+                ['time' => '15:30', 'label' => 'Action de grâce et bénédiction finale'],
+            ],
+            'is_paid' => false,
+            'status' => 'published',
+        ]);
+
+        $autres = [
+            [17, '18:30', '21:00', 'Veillée de prière pour la nouvelle église', 'Prière', 'Toute la communauté', 'Louange, adoration et intercession pour le chantier de la nouvelle église.'],
+            [24, '08:00', '13:00', 'Journée de récollection des servants de messe', 'Formation', 'Servants de messe et leurs parents', 'Temps de formation, de prière et de détente pour les servants de messe.'],
+            [31, '10:00', '17:00', 'Kermesse paroissiale', 'Vie paroissiale', 'Familles et amis de la paroisse', 'Stands, jeux et spécialités culinaires au profit de la construction de la nouvelle église.'],
+        ];
+        foreach ($autres as [$jours, $debut, $fin, $titre, $categorie, $public, $resume]) {
+            Event::create([
+                'title' => $titre,
+                'summary' => $resume,
+                'description' => $resume,
+                'category' => $categorie,
+                'audience' => $public,
+                'date_at' => $aujourdhui->copy()->addDays($jours)->toDateString(),
+                'time_at' => $debut,
+                'end_time' => $fin,
+                'location_at' => 'Paroisse Saint Sauveur Miséricordieux',
+                'programme' => [],
+                'is_paid' => false,
+                'status' => 'published',
+            ]);
+        }
+    }
+
+    /** Publications de la communauté (dont une vidéo à la une) et deux commentaires publiés. */
+    private function publications(): void
+    {
+        if (Publication::exists()) {
+            $this->command?->warn('Publications : déjà renseignées, ignoré.');
+            return;
+        }
+
+        $maintenant = Carbon::now('Africa/Abidjan');
+        $publications = [
+            ['video', 'Vidéo', 'Liturgie', 'Retour en vidéo sur la messe de rentrée pastorale', 'Les temps forts de la célébration qui a rassemblé toute la communauté pour ouvrir la nouvelle année.', null, true, 1, '4:32'],
+            ['photo', 'Album photo', 'Vie paroissiale', 'La kermesse paroissiale en images', 'Stands, jeux et bonne humeur : retour en photos sur une journée de fête au profit de la nouvelle église.', null, false, 3, null],
+            ['text', 'Témoignage', 'Charité', '« L’équipe Caritas m’a aidée à me relever »', 'Une paroissienne raconte comment l’accompagnement de la Caritas a changé son quotidien.', 'On ne m’a pas seulement donné à manger : on m’a redonné confiance.', false, 6, null],
+            ['text', 'Article', 'Chantier', 'Nouvelle église : où en est le chantier ?', 'Le gros œuvre avance : point d’étape sur les travaux et les prochaines échéances.', null, false, 9, null],
+            ['photo', 'Album photo', 'Sacrements', 'Confirmations : nos jeunes reçoivent l’Esprit Saint', 'Retour en images sur la célébration des confirmations présidée par l’évêque.', null, false, 12, null],
+            ['text', 'Article', 'Liturgie', 'La chorale paroissiale fête ses vingt ans', 'Vingt ans de chant au service de la liturgie : histoire, souvenirs et projets de la chorale.', 'Chanter, c’est prier deux fois.', false, 15, null],
+        ];
+
+        foreach ($publications as $i => [$type, $format, $categorie, $titre, $chapeau, $citation, $aLaUne, $joursAvant, $duree]) {
+            Publication::create([
+                'type' => $type,
+                'format' => $format,
+                'category' => $categorie,
+                'title' => $titre,
+                'lead' => $chapeau,
+                'body' => "[Premier paragraphe du texte de la publication.]\n\n[Deuxième paragraphe du texte de la publication.]",
+                'quote' => $citation,
+                'video_url' => null, // lien YouTube à renseigner depuis le back-office
+                'video_duration' => $duree,
+                'is_featured' => $aLaUne,
+                'published_at' => $maintenant->copy()->subDays($joursAvant),
+                'status' => 'published',
+                'sort_order' => $i,
+            ]);
+        }
+
+        $video = Publication::where('type', 'video')->where('is_featured', true)->first();
+        foreach ([
+            ['Marie-Claire', 'Quelle belle célébration ! Merci à la chorale et à tous les servants.'],
+            ['Jean-Baptiste', 'Que Dieu bénisse notre paroisse pour cette nouvelle année pastorale.'],
+        ] as [$auteur, $texte]) {
+            $video->comments()->create(['author' => $auteur, 'content' => $texte, 'status' => 'published']);
+        }
+    }
+
+    /** Conseils et services de la paroisse. */
+    private function conseils(): void
+    {
+        if (Council::exists()) {
+            return;
+        }
+
+        $conseils = [
+            ['Conseil pastoral paroissial', 'Discerne et coordonne les orientations pastorales de la paroisse.', 'Coordinateur'],
+            ['Conseil pour les affaires économiques', 'Veille à la bonne gestion des biens et des ressources de la paroisse.', 'Président'],
+            ['Comité de construction de la nouvelle église', 'Suit le chantier et la mobilisation des fonds pour la nouvelle église.', 'Président'],
+            ['Équipe liturgique', 'Prépare les célébrations et coordonne lecteurs, chorales et servants.', 'Responsable'],
+            ['Secrétariat et accueil paroissial', 'Accueille, informe et oriente les fidèles ; enregistre les demandes.', 'Responsable'],
+        ];
+        foreach ($conseils as $i => [$nom, $role, $titre]) {
+            Council::create([
+                'name' => $nom,
+                'role' => $role,
+                'leader_title' => $titre,
+                'leader_name' => '[Prénom NOM]',
+                'status' => 'published',
+                'sort_order' => $i,
+            ]);
         }
     }
 }

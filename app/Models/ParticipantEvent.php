@@ -36,7 +36,9 @@ class ParticipantEvent extends Model
 	use SoftDeletes;
 
 	protected $casts = [
-		'event_id' => 'int'
+		'event_id'  => 'int',
+		'attendees' => 'int',
+		'reminder'  => 'bool',
 	];
 
 	protected $guarded = [];

@@ -19,6 +19,8 @@ class StoreRequest extends FormRequest
             'missions'          => 'nullable|string|max:500',
             'biography'         => 'nullable|string',
             'ordination_year'   => 'nullable|integer|min:1900|max:2100',
+            'since_year'        => 'nullable|integer|min:1900|max:2100',
+            'congregation'      => 'nullable|string|max:255',
             'photo'             => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'status'            => 'sometimes|string|in:draft,published,hidden',
             'sort_order'        => 'sometimes|integer',

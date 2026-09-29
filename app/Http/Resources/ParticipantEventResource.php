@@ -22,6 +22,8 @@ class ParticipantEventResource extends JsonResource
             'payment_reference' => $this->payment_reference,
             'amount'            => $this->amount,
             'tier_label'        => $this->tier_label,
+            'attendees'         => (int) ($this->attendees ?? 1),
+            'reminder'          => (bool) ($this->reminder ?? true),
 
             'created_at' => optional($this->created_at)->toDateTimeString(),
         ];

@@ -11,6 +11,17 @@ class StoreRequest extends FormRequest
         return true;
     }
 
+    /** En multipart, `programme` peut arriver en chaîne JSON. */
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->input('programme'))) {
+            $decoded = json_decode($this->input('programme'), true);
+            if (is_array($decoded)) {
+                $this->merge(['programme' => $decoded]);
+            }
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -29,6 +40,16 @@ class StoreRequest extends FormRequest
             'pricing_tiers.*.max_participants' => 'nullable|integer|min:1',
             'max_participants'        => 'nullable|integer|min:1',
             'registration_deadline'   => 'nullable|date',
+            // Agenda (sous-pages)
+            'slug'                    => 'nullable|string|max:180|alpha_dash|unique:events,slug',
+            'summary'                 => 'nullable|string|max:500',
+            'category'                => 'nullable|string|max:100',
+            'audience'                => 'nullable|string|max:255',
+            'end_time'                => 'nullable|date_format:H:i',
+            'programme'               => 'sometimes|array',
+            'programme.*.time'        => 'nullable|string|max:20',
+            'programme.*.label'       => 'required_with:programme|string|max:255',
+            'status'                  => 'sometimes|string|in:draft,published,hidden',
         ];
     }
 }

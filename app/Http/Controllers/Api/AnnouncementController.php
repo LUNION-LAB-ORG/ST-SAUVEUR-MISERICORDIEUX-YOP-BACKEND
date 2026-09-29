@@ -50,7 +50,7 @@ class AnnouncementController extends Controller
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->orderByDesc('id')
-            ->paginate((int) $request->input('per_page', 15));
+            ->paginate(max(1, min(100, (int) $request->input('per_page', 15))));
 
         return AnnouncementResource::collection($announcements);
     }

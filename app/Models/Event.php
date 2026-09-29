@@ -6,6 +6,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicationStatus;
+use App\Models\Concerns\HasUniqueSlug;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -35,7 +37,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Event extends Model
 {
-	use SoftDeletes;
+	use SoftDeletes, HasPublicationStatus, HasUniqueSlug;
 
 	protected $casts = [
 		'date_at'               => 'datetime',
@@ -45,9 +47,34 @@ class Event extends Model
 		'pricing_tiers'         => 'array',
 		'max_participants'      => 'integer',
 		'registration_deadline' => 'datetime',
+		'programme'             => 'array',
+	];
+
+	protected $attributes = [
+		'programme' => '[]',
+		'status'    => 'published',
 	];
 
 	protected $guarded = [];
+
+	/** Date de l'événement (Y-m-d), quel que soit le format stocké. */
+	public function dateString(): ?string
+	{
+		$raw = $this->getRawOriginal('date_at') ?? $this->attributes['date_at'] ?? null;
+		return $raw ? substr((string) $raw, 0, 10) : null;
+	}
+
+	/** Extrait HH:MM d'une colonne heure (time ou datetime selon le moteur). */
+	public static function hhmm($value): ?string
+	{
+		if ($value instanceof \DateTimeInterface) {
+			return $value->format('H:i');
+		}
+		if ($value && preg_match('/(\d{2}):(\d{2})/', (string) $value, $m)) {
+			return $m[1] . ':' . $m[2];
+		}
+		return null;
+	}
 
 	public function participants()
 	{

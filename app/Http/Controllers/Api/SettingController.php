@@ -44,7 +44,7 @@ class SettingController extends Controller
         $appUrl = rtrim(env('APP_URL', ''), '/');
         foreach ($map as $key => $value) {
             $setting = Setting::find($key);
-            if ($setting && $setting->type === 'image' && $value) {
+            if ($setting && in_array($setting->type, ['image', 'file'], true) && $value) {
                 $map[$key] = str_starts_with($value, 'http') ? $value : $appUrl . '/' . ltrim($value, '/');
             }
         }
@@ -117,11 +117,48 @@ class SettingController extends Controller
     }
 
     /**
-     * Pour les settings de type image, renvoyer l'URL absolue.
+     * Upload d'un document (ex. feuille d'annonces PDF).
+     * Body: multipart { key, file } — uniquement pour une clé de type « file ».
+     */
+    public function uploadFile(Request $request): JsonResponse
+    {
+        $request->validate([
+            'key'  => 'required|string|max:100',
+            'file' => 'required|file|mimes:pdf|max:10240',
+        ]);
+
+        $setting = Setting::find($request->input('key'));
+        if (!$setting || $setting->type !== 'file') {
+            return response()->json(['error' => 'Clé invalide pour un fichier'], 422);
+        }
+
+        // Supprimer l'ancien fichier
+        if ($setting->value) {
+            $old = preg_replace('#^storage/#', '', $setting->value);
+            if (Storage::disk('public')->exists($old)) {
+                Storage::disk('public')->delete($old);
+            }
+        }
+
+        $path = $request->file('file')->store('documents', 'public');
+        $setting->value = 'storage/' . $path;
+        $setting->save();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'key' => $setting->key,
+                'value' => rtrim(env('APP_URL', ''), '/') . '/' . ltrim($setting->value, '/'),
+            ],
+        ]);
+    }
+
+    /**
+     * Pour les settings de type image ou fichier, renvoyer l'URL absolue.
      */
     private function exposedValue(Setting $s): ?string
     {
-        if ($s->type === 'image' && $s->value) {
+        if (in_array($s->type, ['image', 'file'], true) && $s->value) {
             return str_starts_with($s->value, 'http')
                 ? $s->value
                 : rtrim(env('APP_URL', ''), '/') . '/' . ltrim($s->value, '/');

@@ -27,6 +27,7 @@ class Priest extends Model
 
     protected $casts = [
         'ordination_year' => 'int',
+        'since_year'      => 'int',
         'sort_order'      => 'int',
     ];
 

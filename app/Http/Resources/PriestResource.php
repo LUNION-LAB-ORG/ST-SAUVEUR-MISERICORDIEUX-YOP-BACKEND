@@ -17,6 +17,8 @@ class PriestResource extends JsonResource
             'missions'        => $this->missions,
             'biography'       => $this->biography,
             'ordination_year' => $this->ordination_year !== null ? (int) $this->ordination_year : null,
+            'since_year'      => $this->since_year !== null ? (int) $this->since_year : null,
+            'congregation'    => $this->congregation,
             'photo'           => MediaUrl::absolute($this->photo),
             'status'          => $this->status,
             'sort_order'      => (int) $this->sort_order,

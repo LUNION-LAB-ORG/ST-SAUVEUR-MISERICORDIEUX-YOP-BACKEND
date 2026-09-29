@@ -27,6 +27,10 @@ use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\ScheduleExceptionController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\PublicationController;
+use App\Http\Controllers\Api\PublicationCommentController;
+use App\Http\Controllers\Api\CouncilController;
+use App\Http\Controllers\Api\MassRequestController;
 
 /*
 |--------------------------------------------------------------------------
@@ -151,6 +155,30 @@ Route::middleware('auth:sanctum')->group(function () {
     // Abonnés WhatsApp (export avant la liste)
     Route::get('/subscriptions/export', [SubscriptionController::class, 'export']);
     Route::get('/subscriptions', [SubscriptionController::class, 'index']);
+
+    /*
+    | Sous-pages (lot 2) — mutations admin
+    */
+
+    // Annonces : feuille d'annonces PDF (paramètre de type « file »)
+    Route::post('/settings/upload-file', [SettingController::class, 'uploadFile']);
+
+    // Publications de la communauté + galerie
+    Route::apiResource('publications', PublicationController::class)->except('index', 'show');
+    Route::post('/publications/{id}/gallery', [PublicationController::class, 'addGalleryImage']);
+    Route::delete('/publications/{id}/gallery/{index}', [PublicationController::class, 'removeGalleryImage'])
+        ->whereNumber('index');
+
+    // Modération des commentaires
+    Route::get('/comments', [PublicationCommentController::class, 'index']);
+    Route::put('/comments/{id}', [PublicationCommentController::class, 'update']);
+    Route::delete('/comments/{id}', [PublicationCommentController::class, 'destroy']);
+
+    // Conseils et services
+    Route::apiResource('councils', CouncilController::class)->except('index', 'show');
+
+    // Demandes de messe : liste du célébrant
+    Route::get('/mass-schedules', [MassRequestController::class, 'schedules']);
 });
 
 // PUBLIC ROUTES (accessible sans authentification)
@@ -200,6 +228,29 @@ Route::middleware('throttle:10,1')->group(function () {
     Route::post('/subscriptions', [SubscriptionController::class, 'store']);
     Route::delete('/subscriptions', [SubscriptionController::class, 'destroy']);
 });
+
+// SOUS-PAGES (PUBLIC)
+// Agenda : calendrier iCalendar d'un événement (id ou slug)
+Route::get('/events/{event}/ics', [EventController::class, 'ics']);
+
+// Publications de la communauté
+Route::apiResource('publications', PublicationController::class)->only('index', 'show');
+Route::get('/publications/{id}/comments', [PublicationCommentController::class, 'publicIndex']);
+Route::middleware('throttle:5,1')->post('/publications/{id}/comments', [PublicationCommentController::class, 'store']);
+Route::middleware('throttle:30,1')->group(function () {
+    Route::get('/publications/{id}/like', [PublicationController::class, 'likeStatus']);
+    Route::post('/publications/{id}/like', [PublicationController::class, 'like']);
+    Route::post('/comments/{id}/like', [PublicationCommentController::class, 'like']);
+});
+
+// Équipe pastorale : conseils et services
+Route::apiResource('councils', CouncilController::class)->only('index', 'show');
+
+// Demande de messe (disponibilités avant la route {number})
+Route::get('/mass-requests/availability', [MassRequestController::class, 'availability']);
+Route::middleware('throttle:10,1')->post('/mass-requests', [MassRequestController::class, 'store']);
+Route::get('/mass-requests/{number}/ics', [MassRequestController::class, 'ics']);
+Route::get('/mass-requests/{number}', [MassRequestController::class, 'show']);
 
 // WAVE PAYMENT (PUBLIC - les paroissiens doivent pouvoir payer sans auth admin)
 Route::prefix('wave')->group(function () {

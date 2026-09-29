@@ -76,7 +76,15 @@ class ParticipantEventController extends Controller
             'phone'      => 'nullable|string|max:30',
             'message'    => 'nullable|string',
             'tier_label' => 'nullable|string|max:100',
+            // Nombre de personnes inscrites (la jauge compte la somme) et rappel WhatsApp
+            'attendees'  => 'nullable|integer|min:1|max:20',
+            'reminder'   => 'nullable|boolean',
         ]);
+
+        $attendees = (int) $request->input('attendees', 1) ?: 1;
+        $reminder  = $request->has('reminder') && $request->input('reminder') !== null
+            ? $request->boolean('reminder')
+            : true;
 
         // Vérifier la deadline d'inscription
         if ($event->registration_deadline && now()->gt($event->registration_deadline)) {
@@ -98,14 +106,21 @@ class ParticipantEventController extends Controller
               });
         };
 
-        // Vérifier les places globales disponibles
+        // Vérifier les places globales disponibles (somme des personnes inscrites)
         if ($event->max_participants !== null) {
-            $activeCount = ParticipantEvent::where('event_id', $event->id)
+            $taken = (int) ParticipantEvent::where('event_id', $event->id)
                 ->where($activeCountFilter)
-                ->count();
-            if ($activeCount >= $event->max_participants) {
+                ->sum('attendees');
+            $remaining = max(0, (int) $event->max_participants - $taken);
+
+            if ($remaining === 0) {
                 return response()->json([
                     'error' => 'Cet événement est complet.',
+                ], 422);
+            }
+            if ($attendees > $remaining) {
+                return response()->json([
+                    'error' => "Il ne reste que {$remaining} place(s) pour cet événement.",
                 ], 422);
             }
         }
@@ -119,6 +134,8 @@ class ParticipantEventController extends Controller
                 'message'        => $request->message,
                 'event_id'       => $event->id,
                 'payment_status' => 'free',
+                'attendees'      => $attendees,
+                'reminder'       => $reminder,
             ]);
 
             try { \App\Services\NotificationService::forEventRegistration($participant, $event); } catch (\Throwable $e) {}
@@ -164,17 +181,20 @@ class ParticipantEventController extends Controller
             // ont moins d'1h (au-delà, considérés comme abandonnés → place libre).
             $tierMax = $selectedTier['max_participants'] ?? null;
             if ($tierMax !== null && (int) $tierMax > 0) {
-                $tierTaken = ParticipantEvent::where('event_id', $event->id)
+                $tierTaken = (int) ParticipantEvent::where('event_id', $event->id)
                     ->where('tier_label', $tierLabel)
                     ->where($activeCountFilter)
-                    ->count();
-                if ($tierTaken >= (int) $tierMax) {
+                    ->sum('attendees');
+                if ($tierTaken + $attendees > (int) $tierMax) {
                     return response()->json([
                         'error' => "Plus de places disponibles pour le tarif '$tierLabel'.",
                     ], 422);
                 }
             }
         }
+
+        // Le montant couvre toutes les personnes inscrites
+        $amount = (float) $amount * $attendees;
 
         $clientRef = 'event-' . $event->id . '-' . now()->timestamp;
 
@@ -188,6 +208,8 @@ class ParticipantEventController extends Controller
             'payment_reference'=> $clientRef,
             'amount'           => $amount,
             'tier_label'       => $tierLabel,
+            'attendees'        => $attendees,
+            'reminder'         => $reminder,
         ]);
 
         $apiKey      = config('services.wave.api_key');

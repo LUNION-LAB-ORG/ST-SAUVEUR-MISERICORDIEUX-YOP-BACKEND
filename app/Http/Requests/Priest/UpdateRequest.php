@@ -19,6 +19,8 @@ class UpdateRequest extends FormRequest
             'missions'          => 'sometimes|nullable|string|max:500',
             'biography'         => 'sometimes|nullable|string',
             'ordination_year'   => 'sometimes|nullable|integer|min:1900|max:2100',
+            'since_year'        => 'sometimes|nullable|integer|min:1900|max:2100',
+            'congregation'      => 'sometimes|nullable|string|max:255',
             'photo'             => 'sometimes|nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'status'            => 'sometimes|string|in:draft,published,hidden',
             'sort_order'        => 'sometimes|integer',

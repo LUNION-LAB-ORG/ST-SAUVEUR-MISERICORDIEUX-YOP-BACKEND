@@ -39,6 +39,12 @@ use App\Repositories\ScheduleExceptionRepository;
 use App\Repositories\Contracts\ScheduleExceptionRepositoryInterface;
 use App\Repositories\WhatsappSubscriberRepository;
 use App\Repositories\Contracts\WhatsappSubscriberRepositoryInterface;
+use App\Repositories\PublicationRepository;
+use App\Repositories\Contracts\PublicationRepositoryInterface;
+use App\Repositories\PublicationCommentRepository;
+use App\Repositories\Contracts\PublicationCommentRepositoryInterface;
+use App\Repositories\CouncilRepository;
+use App\Repositories\Contracts\CouncilRepositoryInterface;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -67,6 +73,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(AnnouncementRepositoryInterface::class, AnnouncementRepository::class);
         $this->app->bind(ScheduleExceptionRepositoryInterface::class, ScheduleExceptionRepository::class);
         $this->app->bind(WhatsappSubscriberRepositoryInterface::class, WhatsappSubscriberRepository::class);
+
+        // Sous-pages (lot 2)
+        $this->app->bind(PublicationRepositoryInterface::class, PublicationRepository::class);
+        $this->app->bind(PublicationCommentRepositoryInterface::class, PublicationCommentRepository::class);
+        $this->app->bind(CouncilRepositoryInterface::class, CouncilRepository::class);
     }
 
     /**

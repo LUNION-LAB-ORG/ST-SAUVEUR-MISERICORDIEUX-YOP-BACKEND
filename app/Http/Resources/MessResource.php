@@ -27,6 +27,25 @@ class MessResource extends JsonResource
             'date_at'          => $this->date_at,
             'time_at'          => $this->time_at,
 
+            // Demande en ligne (sous-page /demande-messe)
+            'number'           => $this->number,
+            'intention_type'   => $this->intention_type,
+            'for_whom'         => $this->for_whom,
+            'is_confidential'  => (bool) $this->is_confidential,
+            'formula'          => $this->formula ?? 'single',
+            'masses_count'     => (int) ($this->masses_count ?? 1),
+            'time_slot_id'     => $this->time_slot_id,
+            'will_attend'      => (bool) $this->will_attend,
+            'reminder'         => (bool) ($this->reminder ?? true),
+            'payment_method'   => $this->payment_method,
+            'needs_review'     => (bool) $this->needs_review,
+            'schedules'        => $this->whenLoaded('schedules', fn () => $this->schedules->map(fn ($s) => [
+                'date'    => $s->date,
+                'time'    => $s->hhmm(),
+                'label'   => $s->label,
+                'shifted' => (bool) $s->shifted,
+            ])->values()),
+
             // timestamps
             'created_at'       => optional($this->created_at)->toDateTimeString(),
         ];

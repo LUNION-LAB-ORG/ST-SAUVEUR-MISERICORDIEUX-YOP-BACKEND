@@ -20,6 +20,12 @@ class ListenResource extends JsonResource
             'message'        => $this->message,
             'availability'   => $this->availability,
             'time_slot_id'   => $this->time_slot_id,
+            'priest_id'      => $this->priest_id,
+            'priest'         => $this->priest ? [
+                'id'       => $this->priest->id,
+                'fullname' => $this->priest->fullname,
+                'function' => $this->priest->function,
+            ] : null,
             'request_status' => $this->request_status,
             'listen_at'     => $this->listen_at,
 

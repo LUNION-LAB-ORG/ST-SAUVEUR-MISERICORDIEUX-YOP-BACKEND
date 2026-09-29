@@ -36,8 +36,27 @@ class Mess extends Model
 	protected $casts = [
 		'amount' => 'float',
 		'date_at' => 'datetime',
-		'time_at' => 'datetime'
+		'time_at' => 'datetime',
+		'is_confidential' => 'bool',
+		'masses_count' => 'int',
+		'time_slot_id' => 'int',
+		'will_attend' => 'bool',
+		'reminder' => 'bool',
+		'needs_review' => 'bool',
 	];
+
+	protected $hidden = ['access_token'];
+
+	/** Messes programmées (demande en ligne : 1, 3 ou 9). */
+	public function schedules()
+	{
+		return $this->hasMany(MassSchedule::class)->orderBy('date')->orderBy('time');
+	}
+
+	public function timeSlot()
+	{
+		return $this->belongsTo(TimeSlot::class);
+	}
 
 	protected $guarded = [];
 }
