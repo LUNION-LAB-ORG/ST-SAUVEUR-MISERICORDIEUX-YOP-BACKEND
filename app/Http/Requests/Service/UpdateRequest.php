@@ -20,6 +20,12 @@ class UpdateRequest extends FormRequest
             'content'     => 'sometimes|nullable|string',
             'leader'      => 'sometimes|nullable|string|max:150',
             'schedule'    => 'sometimes|nullable|string|max:255',
+            'category'    => 'sometimes|nullable|string|max:100',
+            'audience'    => 'sometimes|nullable|string|max:255',
+            'location'    => 'sometimes|nullable|string|max:255',
+            'whatsapp'    => 'sometimes|nullable|string|max:30',
+            'status'      => 'sometimes|string|in:draft,published,hidden',
+            'sort_order'  => 'sometimes|integer',
         ];
     }
 }

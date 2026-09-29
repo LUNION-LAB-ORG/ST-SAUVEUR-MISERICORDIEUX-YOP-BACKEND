@@ -18,6 +18,15 @@ use App\Http\Controllers\Api\WaveCheckoutController;
 use App\Http\Controllers\Api\OrganisationController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\SettingController;
+use App\Http\Controllers\Api\LiturgyController;
+use App\Http\Controllers\Api\HomilyController;
+use App\Http\Controllers\Api\PriestController;
+use App\Http\Controllers\Api\ChurchProjectController;
+use App\Http\Controllers\Api\HistoryMilestoneController;
+use App\Http\Controllers\Api\AnnouncementController;
+use App\Http\Controllers\Api\ScheduleController;
+use App\Http\Controllers\Api\ScheduleExceptionController;
+use App\Http\Controllers\Api\SubscriptionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -112,6 +121,36 @@ Route::middleware('auth:sanctum')->group(function () {
     // Paramètres admin (mutations)
     Route::put('/settings', [SettingController::class, 'updateMany']);
     Route::post('/settings/upload-image', [SettingController::class, 'uploadImage']);
+
+    /*
+    | Refonte de l'accueil — mutations admin
+    | Routes spécifiques déclarées avant les apiResource qui pourraient les capturer.
+    */
+
+    // Liturgie du jour (AELF)
+    Route::get('/liturgy/days', [LiturgyController::class, 'days']);
+    Route::post('/liturgy/import', [LiturgyController::class, 'import']);
+    Route::put('/liturgy/{date}', [LiturgyController::class, 'update'])
+        ->where('date', '[0-9]{4}-[0-9]{2}-[0-9]{2}');
+
+    // Contenus éditoriaux
+    Route::apiResource('homilies', HomilyController::class)->except('index', 'show');
+    Route::apiResource('priests', PriestController::class)->except('index', 'show');
+    Route::apiResource('history-milestones', HistoryMilestoneController::class)->except('index', 'show');
+    Route::apiResource('announcements', AnnouncementController::class)->except('index', 'show');
+
+    // Projet « Nouvelle église »
+    Route::put('/church-project', [ChurchProjectController::class, 'update']);
+    Route::post('/church-project/gallery', [ChurchProjectController::class, 'addGalleryImage']);
+    Route::delete('/church-project/gallery/{index}', [ChurchProjectController::class, 'removeGalleryImage'])
+        ->whereNumber('index');
+
+    // Exceptions au planning hebdomadaire
+    Route::apiResource('schedule-exceptions', ScheduleExceptionController::class)->except('index', 'show');
+
+    // Abonnés WhatsApp (export avant la liste)
+    Route::get('/subscriptions/export', [SubscriptionController::class, 'export']);
+    Route::get('/subscriptions', [SubscriptionController::class, 'index']);
 });
 
 // PUBLIC ROUTES (accessible sans authentification)
@@ -138,6 +177,29 @@ Route::apiResource('organisations', OrganisationController::class)->only('store'
 // Settings publics (footer, header...)
 Route::get('/settings', [SettingController::class, 'index']);
 Route::get('/settings/map', [SettingController::class, 'map']);
+
+// REFONTE DE L'ACCUEIL (PUBLIC)
+// Liturgie du jour (import AELF à la volée si besoin)
+Route::get('/liturgy', [LiturgyController::class, 'show']);
+
+// Horaires de la semaine (créneaux récurrents + exceptions) — avant tout apiResource
+Route::get('/schedule/week', [ScheduleController::class, 'week']);
+
+// Projet « Nouvelle église »
+Route::get('/church-project', [ChurchProjectController::class, 'show']);
+
+// Contenus publiés (admin authentifié + ?all=1 : tous les statuts)
+Route::apiResource('homilies', HomilyController::class)->only('index', 'show');
+Route::apiResource('priests', PriestController::class)->only('index', 'show');
+Route::apiResource('history-milestones', HistoryMilestoneController::class)->only('index', 'show');
+Route::apiResource('announcements', AnnouncementController::class)->only('index', 'show');
+Route::apiResource('schedule-exceptions', ScheduleExceptionController::class)->only('index', 'show');
+
+// Abonnement / désabonnement WhatsApp (limité à 10 requêtes par minute)
+Route::middleware('throttle:10,1')->group(function () {
+    Route::post('/subscriptions', [SubscriptionController::class, 'store']);
+    Route::delete('/subscriptions', [SubscriptionController::class, 'destroy']);
+});
 
 // WAVE PAYMENT (PUBLIC - les paroissiens doivent pouvoir payer sans auth admin)
 Route::prefix('wave')->group(function () {

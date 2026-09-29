@@ -27,6 +27,18 @@ use App\Repositories\Contracts\TimeSlotRepositoryInterface;
 use App\Repositories\Contracts\MediationRepositoryInterface;
 use App\Repositories\Contracts\ProgrammationRepositoryInterface;
 use App\Repositories\Contracts\ParticipantEventRepositoryInterface;
+use App\Repositories\PriestRepository;
+use App\Repositories\Contracts\PriestRepositoryInterface;
+use App\Repositories\HomilyRepository;
+use App\Repositories\Contracts\HomilyRepositoryInterface;
+use App\Repositories\HistoryMilestoneRepository;
+use App\Repositories\Contracts\HistoryMilestoneRepositoryInterface;
+use App\Repositories\AnnouncementRepository;
+use App\Repositories\Contracts\AnnouncementRepositoryInterface;
+use App\Repositories\ScheduleExceptionRepository;
+use App\Repositories\Contracts\ScheduleExceptionRepositoryInterface;
+use App\Repositories\WhatsappSubscriberRepository;
+use App\Repositories\Contracts\WhatsappSubscriberRepositoryInterface;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -47,6 +59,14 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(TimeSlotRepositoryInterface::class, TimeSlotRepository::class);
         $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
         $this->app->bind(ParticipantEventRepositoryInterface::class, ParticipantEventRepository::class);
+
+        // Refonte de l'accueil
+        $this->app->bind(PriestRepositoryInterface::class, PriestRepository::class);
+        $this->app->bind(HomilyRepositoryInterface::class, HomilyRepository::class);
+        $this->app->bind(HistoryMilestoneRepositoryInterface::class, HistoryMilestoneRepository::class);
+        $this->app->bind(AnnouncementRepositoryInterface::class, AnnouncementRepository::class);
+        $this->app->bind(ScheduleExceptionRepositoryInterface::class, ScheduleExceptionRepository::class);
+        $this->app->bind(WhatsappSubscriberRepositoryInterface::class, WhatsappSubscriberRepository::class);
     }
 
     /**

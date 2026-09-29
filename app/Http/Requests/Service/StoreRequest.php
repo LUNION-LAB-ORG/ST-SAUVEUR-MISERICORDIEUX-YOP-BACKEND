@@ -20,6 +20,12 @@ class StoreRequest extends FormRequest
             'content'     => 'nullable|string',
             'leader'      => 'nullable|string|max:150',
             'schedule'    => 'nullable|string|max:255',
+            'category'    => 'nullable|string|max:100',
+            'audience'    => 'nullable|string|max:255',
+            'location'    => 'nullable|string|max:255',
+            'whatsapp'    => 'nullable|string|max:30',
+            'status'      => 'sometimes|string|in:draft,published,hidden',
+            'sort_order'  => 'sometimes|integer',
         ];
     }
 }

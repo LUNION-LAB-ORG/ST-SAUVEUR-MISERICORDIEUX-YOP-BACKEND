@@ -12,7 +12,11 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Liturgie du jour (AELF) : import quotidien des 7 prochains jours
+        $schedule->command('liturgy:import')
+            ->dailyAt('00:05')
+            ->timezone('Africa/Abidjan')
+            ->withoutOverlapping();
     }
 
     /**

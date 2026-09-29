@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ResolvesPublicationScope;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Service\StoreRequest;
 use App\Http\Requests\Service\UpdateRequest;
@@ -13,6 +14,11 @@ use Illuminate\Support\Facades\Storage;
 
 class ServiceController extends Controller
 {
+    use ResolvesPublicationScope;
+
+    /** Colonnes autorisées pour ?sort_by= (compatibilité avec l'existant). */
+    private const SORTABLE = ['id', 'title', 'sort_order', 'category', 'status', 'created_at', 'updated_at'];
+
     protected ServiceRepositoryInterface $repo;
 
     public function __construct(ServiceRepositoryInterface $repo)
@@ -20,28 +26,37 @@ class ServiceController extends Controller
         $this->repo = $repo;
     }
 
+    /**
+     * Mouvements et groupes (paginé, per_page ≤ 100).
+     * Public : publiés uniquement. Admin authentifié + ?all=1 : tous les statuts.
+     * Tri par défaut : sort_order ASC, id ASC ; ?sort_by=&sort_dir= restent acceptés.
+     */
     public function index(Request $request)
     {
-        $conditions = [];
+        $query = $this->applyPublicationScope($this->repo->query(), $request);
 
         if ($request->filled('title')) {
-            $conditions[] = ['title', 'LIKE', '%' . $request->title . '%'];
+            $query->where('title', 'LIKE', '%' . $request->title . '%');
         }
 
         if ($request->filled('description')) {
-            $conditions[] = ['description', 'LIKE', '%' . $request->description . '%'];
+            $query->where('description', 'LIKE', '%' . $request->description . '%');
         }
 
-        $services = $this->repo->paginate(
-            with: [],
-            page: (int) $request->input('per_page', 15),
-            conditions: $conditions,
-            skip: (int) $request->input('skip', 0),
-            orderBy: $request->input('sort_by', 'id'),
-            direction: $request->input('sort_dir', 'desc'),
-        );
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
 
-        return ServiceResource::collection($services);
+        if ($request->filled('sort_by') && in_array($request->sort_by, self::SORTABLE, true)) {
+            $direction = strtolower((string) $request->input('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+            $query->orderBy($request->sort_by, $direction);
+        } else {
+            $query->orderBy('sort_order')->orderBy('id');
+        }
+
+        $perPage = max(1, min(100, (int) $request->input('per_page', 15)));
+
+        return ServiceResource::collection($query->paginate($perPage));
     }
 
     public function store(StoreRequest $request)
@@ -60,9 +75,15 @@ class ServiceController extends Controller
             ->setStatusCode(Response::HTTP_CREATED);
     }
 
+    /**
+     * Détail : 404 si non publié (sauf admin authentifié).
+     */
     public function show(string $id)
     {
-        return new ServiceResource($this->repo->find($id));
+        $service = $this->repo->find($id);
+        $this->ensureVisible($service);
+
+        return new ServiceResource($service);
     }
 
     public function update(UpdateRequest $request, string $id)

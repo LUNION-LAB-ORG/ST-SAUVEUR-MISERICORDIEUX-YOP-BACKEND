@@ -17,6 +17,12 @@ class ServiceResource extends JsonResource
             'content'     => $this->content,
             'leader'      => $this->leader,
             'schedule'    => $this->schedule,
+            'category'    => $this->category,
+            'audience'    => $this->audience,
+            'location'    => $this->location,
+            'whatsapp'    => $this->whatsapp,
+            'status'      => $this->status ?? 'published',
+            'sort_order'  => (int) $this->sort_order,
             'created_at'  => optional($this->created_at)->toDateTimeString(),
         ];
     }

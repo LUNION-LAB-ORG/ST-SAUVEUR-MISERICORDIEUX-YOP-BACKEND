@@ -2,10 +2,18 @@
 
 namespace App\Repositories\Contracts;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 interface BaseRepositoryInterface
 {
+    /**
+     * Nouveau query builder sur le modèle (requêtes spécifiques : tri, portée de publication…).
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function query(): Builder;
+
     /**
      * Récupère tous les enregistrements avec relations et conditions facultatives.
      *

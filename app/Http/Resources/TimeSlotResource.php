@@ -12,6 +12,8 @@ class TimeSlotResource extends JsonResource
         return [
             'id'           => $this->id,
             'type'         => $this->type ?? 'ecoute',
+            'label'        => $this->label,
+            'location'     => $this->location,
             'priest_id'    => $this->priest_id,
             'weekday'      => (int) $this->weekday,
             'start_time'   => $this->start_time,

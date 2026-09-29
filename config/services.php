@@ -31,6 +31,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Liturgie du jour (AELF)
+    'aelf' => [
+        'base_url' => env('AELF_BASE_URL', 'https://api.aelf.org/v1'),
+        'zone'     => env('AELF_ZONE', 'afrique'),
+    ],
+
     'wave' => [
         'api_key'        => env('WAVE_API_KEY'),
         'webhook_secret' => env('WAVE_WEBHOOK_SECRET'),

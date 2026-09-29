@@ -15,6 +15,7 @@ class UpdateRequest extends FormRequest
     {
         return [
             'donator'         => 'sometimes|string|max:100',
+            'display_name'    => 'sometimes|boolean',
             'email'           => 'sometimes|nullable|email|max:255',
             'phone'           => 'sometimes|nullable|string|max:30',
             'donation_type'   => 'sometimes|string|in:monetaire,nature',

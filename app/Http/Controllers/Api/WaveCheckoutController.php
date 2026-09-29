@@ -25,6 +25,8 @@ class WaveCheckoutController extends Controller
             'type'             => 'required|string|in:donation,messe,event',
             'client_reference' => 'nullable|string|max:255',
             'donator'          => 'nullable|string|max:255',
+            // Don : « Faire figurer mon nom parmi les bienfaiteurs »
+            'display_name'     => 'nullable|boolean',
             'project'          => 'nullable|string|max:255',
             'description'      => 'nullable|string',
             // Coordonnées donateur (don)
@@ -93,6 +95,7 @@ class WaveCheckoutController extends Controller
             if ($request->type === 'donation') {
                 Donation::create([
                     'donator'        => $request->donator ?? 'Anonyme',
+                    'display_name'   => $request->boolean('display_name'),
                     'email'          => $request->email,
                     'phone'          => $request->phone,
                     'donation_type'  => 'monetaire',

@@ -15,6 +15,8 @@ class StoreRequest extends FormRequest
     {
         return [
             'type'        => 'required|string|in:messe,ecoute,confession,adoration,autre',
+            'label'       => 'nullable|string|max:150',
+            'location'    => 'nullable|string|max:150',
             'priest_id'   => 'nullable|integer|exists:users,id',
             'weekday'     => 'required|integer|min:0|max:6',
             'start_time'  => 'required|string',

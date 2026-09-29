@@ -15,6 +15,7 @@ class StoreRequest extends FormRequest
     {
         return [
             'donator'         => 'required|string|max:100',
+            'display_name'    => 'sometimes|boolean',
             'email'           => 'nullable|email|max:255',
             'phone'           => 'nullable|string|max:30',
             'donation_type'   => 'nullable|string|in:monetaire,nature',

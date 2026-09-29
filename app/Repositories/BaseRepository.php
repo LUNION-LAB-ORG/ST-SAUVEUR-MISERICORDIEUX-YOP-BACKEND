@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Repositories\Contracts\BaseRepositoryInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 abstract class BaseRepository implements BaseRepositoryInterface
@@ -12,6 +13,11 @@ abstract class BaseRepository implements BaseRepositoryInterface
     public function __construct(Model $model)
     {
         $this->model = $model;
+    }
+
+    public function query(): Builder
+    {
+        return $this->model->newQuery();
     }
 
     public function all(array $with = [], array $conditions = [])

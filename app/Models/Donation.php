@@ -33,6 +33,7 @@ class Donation extends Model
 
 	protected $casts = [
 		'amount' => 'float',
+		'display_name' => 'bool',
 		'donation_at' => 'datetime'
 	];
 

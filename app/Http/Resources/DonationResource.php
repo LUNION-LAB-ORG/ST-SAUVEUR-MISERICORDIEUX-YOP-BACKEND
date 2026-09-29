@@ -11,6 +11,7 @@ class DonationResource extends JsonResource
         return [
             'id'             => $this->id,
             'donator'        => $this->donator,
+            'display_name'   => (bool) $this->display_name,
             'email'          => $this->email,
             'phone'          => $this->phone,
             'donation_type'  => $this->donation_type ?? 'monetaire',

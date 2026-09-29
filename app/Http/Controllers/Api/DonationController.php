@@ -98,6 +98,7 @@ class DonationController extends Controller
     {
         $validated = $request->validate([
             'donator'     => 'required|string|max:100',
+            'display_name' => 'nullable|boolean',
             'email'       => 'nullable|email|max:255',
             'phone'       => 'nullable|string|max:30',
             'amount'      => 'required|numeric|min:100',
@@ -107,6 +108,7 @@ class DonationController extends Controller
 
         $donation = \App\Models\Donation::create([
             'donator'        => $validated['donator'],
+            'display_name'   => (bool) ($validated['display_name'] ?? false),
             'email'          => $validated['email'] ?? null,
             'phone'          => $validated['phone'] ?? null,
             'donation_type'  => 'monetaire',

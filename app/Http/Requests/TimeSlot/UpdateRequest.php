@@ -15,6 +15,8 @@ class UpdateRequest extends FormRequest
     {
         return [
             'type'        => 'sometimes|string|in:messe,ecoute,confession,adoration,autre',
+            'label'       => 'sometimes|nullable|string|max:150',
+            'location'    => 'sometimes|nullable|string|max:150',
             'priest_id'   => 'sometimes|nullable|integer|exists:users,id',
             'weekday'     => 'sometimes|integer|min:0|max:6',
             'start_time'  => 'sometimes|string',
