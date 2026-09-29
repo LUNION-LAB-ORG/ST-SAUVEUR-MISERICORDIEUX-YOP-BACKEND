@@ -48,6 +48,7 @@ class Event extends Model
 		'max_participants'      => 'integer',
 		'registration_deadline' => 'datetime',
 		'programme'             => 'array',
+		'registrations_open'    => 'boolean',
 	];
 
 	protected $attributes = [
@@ -74,6 +75,12 @@ class Event extends Model
 			return $m[1] . ':' . $m[2];
 		}
 		return null;
+	}
+
+	/** Inscriptions qui comptent (paiement échoué exclu). */
+	public function activeParticipants()
+	{
+		return $this->participants()->where(fn ($q) => $q->whereNull('payment_status')->orWhere('payment_status', '!=', 'failed'));
 	}
 
 	public function participants()

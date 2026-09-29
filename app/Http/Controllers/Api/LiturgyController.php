@@ -73,6 +73,10 @@ class LiturgyController extends Controller
             }
         }
 
+        if ($imported) {
+            \App\Services\ActivityLogger::log('imported', null, AelfService::importDescription(count($imported)));
+        }
+
         return response()->json(['data' => ['imported' => $imported, 'failed' => $failed]]);
     }
 

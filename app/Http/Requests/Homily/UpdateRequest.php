@@ -19,6 +19,8 @@ class UpdateRequest extends FormRequest
             'title'             => 'sometimes|string|max:255',
             'content'           => 'sometimes|string',
             'audio_url'         => 'sometimes|nullable|url|max:255',
+            'publish_at'        => 'sometimes|nullable|date',
+            'notify_whatsapp'   => 'sometimes|boolean',
             'status'            => 'sometimes|string|in:draft,published,hidden',
         ];
     }

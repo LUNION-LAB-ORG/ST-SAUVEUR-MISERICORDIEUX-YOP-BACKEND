@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Mess\StoreRequest;
 use App\Http\Requests\Mess\UpdateRequest;
 use App\Http\Resources\MessResource;
+use App\Models\Mess;
+use App\Support\CsvExport;
+use Illuminate\Database\Eloquent\Builder;
 use App\Repositories\Contracts\MessRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -36,43 +39,96 @@ class MesseController extends Controller
                 'request_status' => 'canceled',
             ]);
 
-        $conditions = [];
+        $query = $this->filteredQuery($request)->with(['schedules', 'timeSlot']);
 
-        // Filters
-        if ($request->filled('type')) {
-            $conditions[] = ['type', 'LIKE', '%' . $request->type . '%'];
-        }
-
-        if ($request->filled('fullname')) {
-            $conditions[] = ['fullname', 'LIKE', '%' . $request->fullname . '%'];
-        }
-
-        if ($request->filled('phone')) {
-            $conditions[] = ['phone', 'LIKE', '%' . $request->phone . '%'];
-        }
-
-        if ($request->filled('status')) {
-            $conditions[] = ['request_status', '=', $request->status];
-        }
-
-        if ($request->filled('from')) {
-            $conditions[] = ['date_at', '>=', $request->from];
-        }
-
-        if ($request->filled('to')) {
-            $conditions[] = ['date_at', '<=', $request->to];
-        }
-
-        $messes = $this->repo->paginate(
-            with: [],
-            page: (int) $request->input('per_page', 15),
-            conditions: $conditions,
-            skip: (int) $request->input('skip', 0),
-            orderBy: $request->input('sort_by', 'id'),
-            direction: $request->input('sort_dir', 'desc'),
-        );
+        $messes = $query
+            ->orderBy($request->input('sort_by', 'id'), $request->input('sort_dir', 'desc'))
+            ->paginate((int) $request->input('per_page', 15));
 
         return MessResource::collection($messes);
+    }
+
+    /**
+     * Export CSV des demandes de messe (admin). ?status=&from=&to=
+     */
+    public function export(Request $request)
+    {
+        $messes = $this->filteredQuery($request)->with(['schedules', 'timeSlot'])->orderBy('id')->get();
+
+        $formulas = ['single' => 'Messe unique', 'triduum' => 'Triduum', 'novena' => 'Neuvaine'];
+        $methods = ['wave' => 'Wave', 'secretariat' => 'Secrétariat', 'cash' => 'Espèces', 'orange' => 'Orange Money', 'mtn' => 'MTN MoMo', 'moov' => 'Moov Money', 'card' => 'Carte'];
+
+        $rows = $messes->map(function (Mess $m) use ($formulas, $methods) {
+            $dates = $m->schedules->isNotEmpty()
+                ? $m->schedules->map(fn ($s) => CsvExport::date($s->date) . ' ' . $s->hhmm())->implode(' / ')
+                : CsvExport::date($m->getRawOriginal('date_at')) . ' ' . substr((string) $m->getRawOriginal('time_at'), -8, 5);
+
+            return [
+                $m->number ?: '#' . $m->id,
+                trim($dates),
+                $m->schedules->first()?->label ?? $m->timeSlot?->label,
+                $m->intention_type ?: $m->type,
+                $m->is_confidential ? 'Intention confidentielle' : $m->for_whom,
+                $m->is_confidential ? '' : $m->message,
+                $formulas[$m->formula ?? 'single'] ?? $m->formula,
+                (int) $m->amount,
+                trim(($methods[$m->payment_method] ?? (string) $m->payment_method) . ' — ' . CsvExport::paymentStatus($m->payment_status), ' —'),
+                $m->fullname,
+                $m->phone,
+            ];
+        });
+
+        return CsvExport::download(
+            'demandes-de-messe-' . now()->format('Y-m-d') . '.csv',
+            ['N°', 'Date(s) des messes', 'Créneau', 'Type d’intention', 'Pour qui', 'Intention', 'Formule', 'Offrande (FCFA)', 'Paiement', 'Demandeur', 'Téléphone'],
+            $rows
+        );
+    }
+
+    /**
+     * Filtres communs liste / export.
+     * ?status=to_process|to_pay|paid|all (ou une valeur de request_status, comportement historique),
+     * ?q= (numéro, nom, pour qui, téléphone), ?date= (date d'une messe programmée), ?from=&to=, ?type=, ?fullname=, ?phone=
+     */
+    private function filteredQuery(Request $request): Builder
+    {
+        $query = Mess::query();
+
+        match ($request->input('status')) {
+            null, '', 'all' => null,
+            'to_process'    => $query->where('request_status', 'pending'),
+            'to_pay'        => $query->where('payment_status', 'to_pay'),
+            'paid'          => $query->where('payment_status', 'succeeded'),
+            default         => $query->where('request_status', $request->input('status')),
+        };
+
+        if ($request->filled('q')) {
+            $term = '%' . trim($request->input('q')) . '%';
+            $query->where(fn ($q) => $q->where('number', 'LIKE', $term)
+                ->orWhere('fullname', 'LIKE', $term)
+                ->orWhere('for_whom', 'LIKE', $term)
+                ->orWhere('phone', 'LIKE', $term));
+        }
+
+        if ($request->filled('date')) {
+            $date = $request->input('date');
+            $query->where(fn ($q) => $q->whereHas('schedules', fn ($s) => $s->where('date', $date))
+                ->orWhere(fn ($legacy) => $legacy->whereDoesntHave('schedules')->whereDate('date_at', $date)));
+        }
+
+        foreach (['type' => 'type', 'fullname' => 'fullname', 'phone' => 'phone'] as $param => $column) {
+            if ($request->filled($param)) {
+                $query->where($column, 'LIKE', '%' . $request->input($param) . '%');
+            }
+        }
+        if ($request->filled('from')) {
+            $query->whereDate('date_at', '>=', $request->input('from'));
+        }
+        if ($request->filled('to')) {
+            $query->whereDate('date_at', '<=', $request->input('to'));
+        }
+
+        return $query;
     }
 
     /**
@@ -137,7 +193,7 @@ class MesseController extends Controller
      */
     public function show(string $id)
     {
-        return new MessResource($this->repo->find($id));
+        return new MessResource($this->repo->find($id, ['schedules', 'timeSlot']));
     }
 
     /**
@@ -146,7 +202,7 @@ class MesseController extends Controller
     public function update(UpdateRequest $request, string $id)
     {
         $messe = $this->repo->update($id, $request->validated());
-        return new MessResource($messe);
+        return new MessResource($messe->load(['schedules', 'timeSlot']));
     }
 
     /**

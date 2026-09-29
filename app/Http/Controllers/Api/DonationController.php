@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Donation\StoreRequest;
 use App\Http\Requests\Donation\UpdateRequest;
 use App\Http\Resources\DonationResource;
+use App\Support\CsvExport;
 use App\Repositories\Contracts\DonationRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -35,38 +36,75 @@ class DonationController extends Controller
             ->where('created_at', '<', now()->subHour())
             ->update(['payment_status' => 'failed']);
 
-        $conditions = [];
+        $query = $this->filteredQuery($request);
 
-        // Filters
-        if ($request->filled('project')) {
-            $conditions[] = ['project', '=', $request->project];
-        }
+        // Somme des dons réussis parmi les lignes filtrées
+        $totalAmount = (int) (clone $query)->where('payment_status', 'succeeded')->sum('amount');
 
-        if ($request->filled('donator')) {
-            $conditions[] = ['donator', 'LIKE', "%" . $request->donator . "%"];
-        }
+        $donations = $query
+            ->orderBy($request->input('sort_by', 'id'), $request->input('sort_dir', 'desc'))
+            ->paginate((int) $request->input('per_page', 15));
 
-        if ($request->filled('paymethod')) {
-            $conditions[] = ['paymethod', '=', $request->paymethod];
-        }
+        return DonationResource::collection($donations)->additional(['meta' => ['total_amount' => $totalAmount]]);
+    }
 
-        if ($request->filled('from')) {
-            $conditions[] = ['donation_at', '>=', $request->from];
-        }
+    /**
+     * Export CSV des dons (admin, trésorier, secrétariat). Mêmes filtres que la liste.
+     */
+    public function export(Request $request)
+    {
+        $methods = ['wave' => 'Wave', 'especes' => 'Espèces', 'cash' => 'Espèces', 'cheque' => 'Chèque', 'virement' => 'Virement'];
 
-        if ($request->filled('to')) {
-            $conditions[] = ['donation_at', '<=', $request->to];
-        }
+        $rows = $this->filteredQuery($request)->orderBy('donation_at')->orderBy('id')->get()
+            ->map(fn (\App\Models\Donation $d) => [
+                CsvExport::date($d->donation_at),
+                $d->donator,
+                $d->email,
+                $d->phone,
+                $d->donation_type === 'nature' ? 'En nature' : 'Monétaire',
+                $d->project,
+                (int) $d->amount,
+                $methods[$d->paymethod] ?? $d->paymethod,
+                CsvExport::paymentStatus($d->payment_status ?? 'succeeded'),
+                $d->paytransaction,
+                $d->display_name ? 'Oui' : 'Non',
+                $d->description,
+            ]);
 
-        $donations = $this->repo->paginate(
-            with: [],
-            page: (int) $request->input('per_page', 15),
-            conditions: $conditions,
-            skip: (int) $request->input('skip', 0),
-            orderBy: $request->input('sort_by', 'id'),
-            direction: $request->input('sort_dir', 'desc'),
+        return CsvExport::download(
+            'dons-' . now()->format('Y-m-d') . '.csv',
+            ['Date', 'Donateur', 'E-mail', 'Téléphone', 'Type', 'Projet', 'Montant (FCFA)', 'Moyen de paiement', 'Statut', 'Référence de transaction', 'Nom affiché parmi les bienfaiteurs', 'Description'],
+            $rows
         );
+    }
 
+    /**
+     * Filtres : ?status=succeeded|pending|failed, ?method= (ou paymethod), ?project=, ?donator=, ?from=&to=
+     */
+    private function filteredQuery(Request $request): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = \App\Models\Donation::query();
+
+        if ($request->filled('status')) {
+            $query->where('payment_status', $request->input('status'));
+        }
+        if ($request->filled('method') || $request->filled('paymethod')) {
+            $query->where('paymethod', $request->input('method', $request->input('paymethod')));
+        }
+        if ($request->filled('project')) {
+            $query->where('project', $request->input('project'));
+        }
+        if ($request->filled('donator')) {
+            $query->where('donator', 'LIKE', '%' . $request->input('donator') . '%');
+        }
+        if ($request->filled('from')) {
+            $query->whereDate('donation_at', '>=', $request->input('from'));
+        }
+        if ($request->filled('to')) {
+            $query->whereDate('donation_at', '<=', $request->input('to'));
+        }
+
+        return $query;
         return DonationResource::collection($donations);
     }
 

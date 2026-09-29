@@ -50,6 +50,7 @@ class StoreRequest extends FormRequest
             'programme.*.time'        => 'nullable|string|max:20',
             'programme.*.label'       => 'required_with:programme|string|max:255',
             'status'                  => 'sometimes|string|in:draft,published,hidden',
+            'registrations_open'      => 'sometimes|boolean',
         ];
     }
 }

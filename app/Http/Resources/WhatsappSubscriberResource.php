@@ -13,6 +13,7 @@ class WhatsappSubscriberResource extends JsonResource
             'id'              => $this->id,
             'phone'           => $this->phone,
             'lists'           => $this->lists ?? [],
+            'source'          => $this->source,
             'consented_at'    => optional($this->consented_at)->toDateTimeString(),
             'unsubscribed_at' => optional($this->unsubscribed_at)->toDateTimeString(),
             'created_at'      => optional($this->created_at)->toDateTimeString(),

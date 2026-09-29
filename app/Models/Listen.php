@@ -37,6 +37,8 @@ class Listen extends Model
 	protected $casts = [
 		'time_slot_id' => 'int',
 		'priest_id' => 'int',
+		'assigned_priest_id' => 'int',
+		'proposed_at' => 'datetime',
 		'listen_at' => 'datetime'
 	];
 
@@ -51,6 +53,12 @@ class Listen extends Model
 	public function priest()
 	{
 		return $this->belongsTo(Priest::class)->withTrashed();
+	}
+
+	/** Prêtre assigné par le secrétariat. */
+	public function assignedPriest()
+	{
+		return $this->belongsTo(Priest::class, 'assigned_priest_id')->withTrashed();
 	}
 
 	// Alias snake_case pour rétrocompatibilité

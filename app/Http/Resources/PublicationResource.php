@@ -30,6 +30,8 @@ class PublicationResource extends JsonResource
             'author_label'    => $this->author_label,
             'is_featured'     => (bool) $this->is_featured,
             'likes_count'     => (int) $this->likes_count,
+            'allow_comments'  => (bool) ($this->allow_comments ?? true),
+            'show_likes'      => (bool) ($this->show_likes ?? true),
             'comments_count'  => (int) ($this->published_comments_count
                 ?? $this->comments()->where('status', 'published')->count()),
             'photos_count'    => count($gallery),

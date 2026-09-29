@@ -86,6 +86,13 @@ class ParticipantEventController extends Controller
             ? $request->boolean('reminder')
             : true;
 
+        // Inscriptions fermées depuis le back-office
+        if ($event->registrations_open === false) {
+            return response()->json([
+                'error' => 'Les inscriptions sont fermées.',
+            ], 422);
+        }
+
         // Vérifier la deadline d'inscription
         if ($event->registration_deadline && now()->gt($event->registration_deadline)) {
             return response()->json([
@@ -263,6 +270,57 @@ class ParticipantEventController extends Controller
             $participant->delete();
             return response()->json(['error' => 'Erreur de connexion Wave.'], 503);
         }
+    }
+
+    /**
+     * Inscrits d'un événement (admin). GET /events/{id}/participants
+     */
+    public function forEvent(string $id)
+    {
+        $event = Event::findOrFail($id);
+
+        $participants = ParticipantEvent::where('event_id', $event->id)
+            ->orderByDesc('created_at')->orderByDesc('id')->get()
+            ->map(fn (ParticipantEvent $p) => [
+                'id'             => $p->id,
+                'fullname'       => $p->fullname,
+                'phone'          => $p->phone,
+                'email'          => $p->email,
+                'attendees'      => (int) ($p->attendees ?? 1),
+                'reminder'       => (bool) ($p->reminder ?? true),
+                'payment_status' => $p->payment_status ?? 'free',
+                'tier_label'     => $p->tier_label,
+                'created_at'     => optional($p->created_at)->toDateTimeString(),
+            ]);
+
+        return response()->json(['data' => $participants]);
+    }
+
+    /**
+     * Export CSV des inscrits (admin). GET /events/{id}/participants/export
+     */
+    public function exportForEvent(string $id)
+    {
+        $event = Event::findOrFail($id);
+
+        $rows = ParticipantEvent::where('event_id', $event->id)->orderBy('created_at')->orderBy('id')->get()
+            ->map(fn (ParticipantEvent $p) => [
+                $p->fullname,
+                $p->phone,
+                $p->email,
+                (int) ($p->attendees ?? 1),
+                ($p->reminder ?? true) ? 'Oui' : 'Non',
+                \App\Support\CsvExport::paymentStatus($p->payment_status ?? 'free'),
+                $p->tier_label,
+                $p->amount !== null ? (int) $p->amount : '',
+                \App\Support\CsvExport::date($p->created_at, true),
+            ]);
+
+        return \App\Support\CsvExport::download(
+            'inscrits-' . ($event->slug ?: $event->id) . '.csv',
+            ['Nom', 'Téléphone (WhatsApp)', 'E-mail', 'Personnes', 'Rappel', 'Paiement', 'Tarif', 'Montant (FCFA)', 'Inscrit le'],
+            $rows
+        );
     }
 
     public function store(StoreRequest $request)

@@ -50,6 +50,13 @@ class PublicationCommentController extends Controller
     public function store(StoreRequest $request, string $publicationId)
     {
         $publication = $this->visiblePublication($publicationId);
+
+        if ($publication->allow_comments === false) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'content' => 'Les commentaires sont fermés pour cette publication.',
+            ]);
+        }
+
         $data = $request->validated();
 
         $comment = $this->repo->create([

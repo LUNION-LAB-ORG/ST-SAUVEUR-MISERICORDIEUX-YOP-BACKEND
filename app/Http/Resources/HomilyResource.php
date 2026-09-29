@@ -16,8 +16,11 @@ class HomilyResource extends JsonResource
             'date'      => $this->date,
             'title'     => $this->title,
             'content'   => $this->content,
-            'audio_url' => $this->audio_url,
+            'audio_url' => \App\Support\MediaUrl::absolute($this->audio_url),
             'status'    => $this->status,
+            'state'     => $this->state(),
+            'publish_at'      => optional($this->publish_at)->toDateTimeString(),
+            'notify_whatsapp' => (bool) $this->notify_whatsapp,
             'priest'    => $priest ? [
                 'id'       => $priest->id,
                 'fullname' => $priest->fullname,

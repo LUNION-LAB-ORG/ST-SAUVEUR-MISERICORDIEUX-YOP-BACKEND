@@ -17,6 +17,12 @@ class AelfService
     /** Balises HTML conservées dans les textes liturgiques (sans attributs). */
     private const ALLOWED_TAGS = ['p', 'br', 'strong', 'em'];
 
+    /** Phrase du journal d'activité : « Textes AELF importés : 7 jours ». */
+    public static function importDescription(int $days): string
+    {
+        return 'Textes AELF importés : ' . $days . ' ' . ($days > 1 ? 'jours' : 'jour');
+    }
+
     /**
      * Importe (upsert) la journée liturgique d'une date.
      * En cas d'échec : log et aucune donnée existante n'est écrasée.

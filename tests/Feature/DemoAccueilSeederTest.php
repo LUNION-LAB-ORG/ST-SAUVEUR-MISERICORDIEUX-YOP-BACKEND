@@ -24,6 +24,7 @@ class DemoAccueilSeederTest extends TestCase
         return collect([
             'time_slots', 'priests', 'homilies', 'services', 'history_milestones', 'announcements',
             'events', 'publications', 'publication_comments', 'councils', 'schedule_exceptions',
+            'users', 'messes', 'mass_schedules', 'donations', 'listens', 'whatsapp_subscribers', 'activity_logs',
         ])->mapWithKeys(fn ($table) => [$table => DB::table($table)->count()])->all();
     }
 
@@ -61,9 +62,43 @@ class DemoAccueilSeederTest extends TestCase
         $this->assertSame('2000', Setting::find('mass.offering_amount')->value);
         $this->assertSame('Lundi au samedi, 8 h – 12 h et 15 h – 18 h', Setting::find('parish.office_hours')->value);
 
+        // Back-office (lot 3)
+        $this->assertEqualsCanonicalizing(
+            ['secretariat', 'priest', 'communication', 'treasurer', 'movement_leader'],
+            \App\Models\User::where('email', 'like', '%@demo.local')->pluck('role')->all()
+        );
+        $leader = \App\Models\User::where('email', 'mouvement@demo.local')->first();
+        $this->assertNotNull($leader->service_id);
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('password123', $leader->password));
+        $this->postJson('/api/auth/login', ['email' => 'pretre@demo.local', 'password' => 'password123'])->assertOk()->assertJsonPath('data.role', 'priest');
+
+        $this->assertTrue(\App\Models\Mess::where('request_status', 'pending')->exists());
+        $this->assertTrue(\App\Models\Mess::where('payment_status', 'to_pay')->exists());
+        $this->assertTrue(\App\Models\Mess::where('payment_status', 'succeeded')->exists());
+        $this->assertSame(1, \App\Models\Mess::where('is_confidential', true)->count());
+        $this->assertSame(4, \App\Models\Donation::where('payment_status', 'succeeded')->count());
+        $this->assertSame(2, \App\Models\Listen::where('request_status', 'pending')->count());
+        $this->assertSame(4, PublicationComment::where('status', 'pending')->count());
+        $this->assertSame(3, \App\Models\WhatsappSubscriber::count());
+        $this->assertSame(0, DB::table('activity_logs')->count());
+
+        $dashboard = $this->actingAs($leader, 'sanctum')->getJson('/api/admin/dashboard')->assertOk()->json('data');
+        $this->assertSame(4, $dashboard['comments']['pending']);
+        $this->assertSame(2, $dashboard['listens']['pending']);
+        $this->assertGreaterThan(0, $dashboard['donations_week']['count']);
+
         // La page d'accueil / agenda répond avec les données de démonstration
         $this->getJson('/api/events?upcoming=1')->assertOk()->assertJsonPath('meta.total', 4);
         $this->getJson('/api/publications?featured=1')->assertOk()->assertJsonPath('data.0.type', 'video');
+    }
+
+    public function test_no_demo_accounts_in_production(): void
+    {
+        $this->app['env'] = 'production';
+        $this->app->make(DemoAccueilSeeder::class)->run();
+        $this->app['env'] = 'testing';
+
+        $this->assertSame(0, \App\Models\User::where('email', 'like', '%@demo.local')->count());
     }
 
     public function test_seeder_never_overwrites_real_content(): void

@@ -22,7 +22,7 @@ class StoreRequest extends FormRequest
             'availability'  => 'nullable|string|max:100',
             'time_slot_id'  => 'nullable|integer|exists:time_slots,id',
             'listen_at'     => 'nullable|date',
-            'request_status' => 'nullable|string|in:pending,accepted,canceled',
+            'request_status' => 'nullable|string|in:pending,accepted,canceled,confirmed,closed',
         ];
     }
 }

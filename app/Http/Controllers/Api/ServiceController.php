@@ -88,8 +88,15 @@ class ServiceController extends Controller
 
     public function update(UpdateRequest $request, string $id)
     {
-        $data = $request->validated();
         $existing = $this->repo->find($id);
+
+        // Responsable de mouvement : uniquement la fiche de son mouvement
+        $user = $request->user();
+        if ($user && $user->role === 'movement_leader' && (int) $user->service_id !== (int) $existing->id) {
+            return \App\Http\Middleware\EnsureRole::forbidden();
+        }
+
+        $data = $request->validated();
 
         if ($request->hasFile('image')) {
             if ($existing && $existing->image && Storage::disk('public')->exists(preg_replace('#^storage/#', '', $existing->image))) {

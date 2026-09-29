@@ -27,6 +27,8 @@ class UpdateRequest extends FormRequest
             'video_duration'    => 'sometimes|nullable|string|max:20',
             'author_label'      => 'sometimes|string|max:255',
             'is_featured'       => 'sometimes|boolean',
+            'allow_comments'    => 'sometimes|boolean',
+            'show_likes'        => 'sometimes|boolean',
             'published_at'      => 'sometimes|nullable|date',
             'status'            => 'sometimes|string|in:draft,published,hidden',
             'sort_order'        => 'sometimes|integer',

@@ -14,7 +14,15 @@ use App\Models\ScheduleException;
 use App\Models\Service;
 use App\Models\Setting;
 use App\Models\TimeSlot;
+use App\Models\Donation;
+use App\Models\Listen;
+use App\Models\Mess;
+use App\Models\PublicationComment;
+use App\Models\User;
+use App\Models\WhatsappSubscriber;
+use App\Services\MassRequestService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Seeder;
 
 /**
@@ -31,6 +39,12 @@ class DemoAccueilSeeder extends Seeder
 {
     public function run(): void
     {
+        // Les données de démonstration n'alimentent pas le journal d'activité
+        \App\Services\ActivityLogger::withoutLogging(fn () => $this->remplir());
+    }
+
+    private function remplir(): void
+    {
         $this->horaires();
         $this->pretresEtHomelie();
         $this->mouvements();
@@ -44,6 +58,14 @@ class DemoAccueilSeeder extends Seeder
         $this->evenements();
         $this->publications();
         $this->conseils();
+
+        // Back-office (lot 3)
+        $this->utilisateursDemo();
+        $this->demandesDeMesse();
+        $this->dons();
+        $this->rendezVous();
+        $this->commentairesEnAttente();
+        $this->abonnes();
     }
 
     /** Horaires récurrents (0 = dimanche). Uniquement si aucun créneau de célébration n'existe. */
@@ -402,6 +424,196 @@ class DemoAccueilSeeder extends Seeder
                 'leader_name' => '[Prénom NOM]',
                 'status' => 'published',
                 'sort_order' => $i,
+            ]);
+        }
+    }
+
+    /**
+     * Un compte de démonstration par rôle (jamais en production). Mot de passe : password123.
+     */
+    private function utilisateursDemo(): void
+    {
+        if (app()->environment('production')) {
+            $this->command?->warn('Comptes de démonstration : ignorés en production.');
+            return;
+        }
+
+        $comptes = [
+            ['secretariat@demo.local', 'Secrétariat (démo)', 'secretariat', null],
+            ['pretre@demo.local', 'Père (démo)', 'priest', null],
+            ['communication@demo.local', 'Communication (démo)', 'communication', null],
+            ['tresorier@demo.local', 'Trésorier (démo)', 'treasurer', null],
+            ['mouvement@demo.local', 'Responsable de mouvement (démo)', 'movement_leader', Service::orderBy('sort_order')->orderBy('id')->value('id')],
+        ];
+
+        foreach ($comptes as $i => [$email, $nom, $role, $serviceId]) {
+            if (User::withTrashed()->where('email', $email)->exists()) {
+                continue;
+            }
+            User::create([
+                'name' => $nom,
+                'fullname' => $nom,
+                'email' => $email,
+                'phone' => '+22500000000' . ($i + 1),
+                'password' => Hash::make('password123'),
+                'role' => $role,
+                'status' => 'active',
+                'service_id' => $serviceId,
+            ]);
+        }
+    }
+
+    /** Demandes de messe : à traiter, à régler au secrétariat, payées. Si aucune demande en ligne n'existe. */
+    private function demandesDeMesse(): void
+    {
+        if (Mess::whereNotNull('number')->exists()) {
+            return;
+        }
+
+        $service = app(MassRequestService::class);
+        $demandes = [
+            ['Action de grâce', 'Famille Kouadio', 'Pour 25 ans de mariage', false, 'single', 'secretariat', 'to_pay', 'pending'],
+            ['Repos de l’âme', 'Feu Jean-Baptiste Yao', 'Pour le repos de son âme', false, 'triduum', 'wave', 'succeeded', 'accepted'],
+            ['Intention particulière', 'Une intention confidentielle', null, true, 'single', 'secretariat', 'to_pay', 'pending'],
+            ['Pour un malade', 'Marie-Thérèse', 'Pour sa guérison', false, 'single', 'wave', 'succeeded', 'pending'],
+            ['Action de grâce', 'Promotion 2026 du lycée', 'Réussite aux examens', false, 'single', 'cash', 'succeeded', 'accepted'],
+        ];
+
+        foreach ($demandes as $i => [$type, $pourQui, $intention, $confidentiel, $formule, $moyen, $paiement, $statut]) {
+            $creneau = $this->prochainCreneauMesse($service, $i + 1);
+            if (!$creneau) {
+                $this->command?->warn('Demandes de messe : aucun créneau de messe disponible, ignoré.');
+                return;
+            }
+            [$date, $slotId] = $creneau;
+
+            try {
+                $service->create([
+                    'type' => $type,
+                    'intention_type' => $type,
+                    'for_whom' => $pourQui,
+                    'message' => $intention,
+                    'is_confidential' => $confidentiel,
+                    'formula' => $formule,
+                    'fullname' => '[Demandeur ' . ($i + 1) . ']',
+                    'phone' => '+2250700000' . str_pad((string) ($i + 10), 3, '0', STR_PAD_LEFT),
+                    'amount' => MassRequestService::FORMULAS[$formule] * 2000,
+                    'payment_method' => $moyen,
+                    'payment_status' => $paiement,
+                    'request_status' => $statut,
+                ], $date, $slotId, MassRequestService::FORMULAS[$formule], false);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $this->command?->warn('Demande de messe de démonstration ignorée : ' . collect($e->errors())->flatten()->first());
+            }
+        }
+    }
+
+    /** Prochain créneau de messe non complet à partir de J+offset (14 jours de recherche). */
+    private function prochainCreneauMesse(MassRequestService $service, int $offset): ?array
+    {
+        $jour = Carbon::today('Africa/Abidjan')->addDays($offset);
+
+        for ($i = 0; $i < 14; $i++, $jour->addDay()) {
+            foreach ($service->celebratedSlots($jour) as $slot) {
+                if ($service->slotInfo($jour, $slot)['status'] !== 'full') {
+                    return [$jour->copy(), $slot->id];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Dons de la semaine (uniquement si aucun don n'existe). */
+    private function dons(): void
+    {
+        if (Donation::exists()) {
+            return;
+        }
+
+        $debut = Carbon::now('Africa/Abidjan')->startOfWeek(Carbon::MONDAY);
+        $dons = [
+            ['Anonyme', 10000, 'Nouvelle église', 'wave', 'succeeded', true],
+            ['Famille Koffi', 50000, 'Nouvelle église', 'wave', 'succeeded', true],
+            ['[Donateur]', 25000, 'Nouvelle église', 'especes', 'succeeded', false],
+            ['[Donateur]', 5000, 'Fonctionnement', 'wave', 'succeeded', false],
+            ['[Donateur]', 100000, 'Nouvelle église', 'especes', 'pending', false],
+        ];
+
+        foreach ($dons as $i => [$donateur, $montant, $projet, $moyen, $statut, $nomAffiche]) {
+            Donation::create([
+                'donator' => $donateur,
+                'display_name' => $nomAffiche,
+                'donation_type' => 'monetaire',
+                'amount' => $montant,
+                'project' => $projet,
+                'paymethod' => $moyen,
+                'payment_status' => $statut,
+                'donation_at' => $debut->copy()->addHours(9 + $i * 5)->min(Carbon::now('Africa/Abidjan')),
+            ]);
+        }
+    }
+
+    /** Deux rendez-vous en attente (uniquement si aucun rendez-vous n'existe). */
+    private function rendezVous(): void
+    {
+        if (Listen::exists()) {
+            return;
+        }
+
+        $pretre = Priest::orderBy('sort_order')->value('id');
+        foreach ([['Accompagnement spirituel', 'Je souhaite être accompagné pendant ce temps de discernement.'], ['Préparation au mariage', null]] as $i => [$motif, $message]) {
+            Listen::create([
+                'type' => $motif,
+                'fullname' => '[Paroissien ' . ($i + 1) . ']',
+                'phone' => '+2250500000' . str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT),
+                'message' => $message,
+                'priest_id' => $pretre,
+                'request_status' => 'pending',
+            ]);
+        }
+    }
+
+    /** Quatre commentaires à modérer (uniquement si aucun commentaire n'est en attente). */
+    private function commentairesEnAttente(): void
+    {
+        if (PublicationComment::where('status', 'pending')->exists()) {
+            return;
+        }
+
+        $publications = Publication::orderByDesc('published_at')->limit(2)->get();
+        if ($publications->isEmpty()) {
+            return;
+        }
+
+        $commentaires = [
+            ['Awa', 'Merci pour ces belles photos, quelle joie de revoir cette journée !'],
+            ['Serge', 'Est-il possible d’avoir la vidéo complète de la célébration ?'],
+            ['Christelle', 'Que Dieu bénisse tous les bénévoles de la paroisse.'],
+            ['Paul', 'Très beau témoignage, merci de l’avoir partagé.'],
+        ];
+        foreach ($commentaires as $i => [$auteur, $texte]) {
+            $publications[$i % $publications->count()]->comments()->create([
+                'author' => $auteur,
+                'content' => $texte,
+                'status' => 'pending',
+            ]);
+        }
+    }
+
+    /** Trois abonnés WhatsApp (uniquement si la liste est vide). */
+    private function abonnes(): void
+    {
+        if (WhatsappSubscriber::exists()) {
+            return;
+        }
+
+        foreach ([['+2250700000101', ['parole', 'annonces'], 'home'], ['+2250700000102', ['parole'], 'announcements'], ['+2250700000103', ['annonces'], 'mass_request']] as [$tel, $listes, $source]) {
+            WhatsappSubscriber::create([
+                'phone' => $tel,
+                'lists' => $listes,
+                'source' => $source,
+                'consented_at' => now(),
             ]);
         }
     }

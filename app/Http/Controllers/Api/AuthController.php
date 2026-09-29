@@ -21,7 +21,23 @@ class AuthController extends Controller
         $data = $request->validated();
         $data['password'] = bcrypt($data['password']);
 
+        // Sécurité : l'inscription publique ne donne jamais accès au back-office.
+        // Seul le tout premier compte (base vide) est créé administrateur actif ;
+        // les suivants sont créés désactivés, avec le rôle le plus restreint, en attente
+        // d'activation (et d'attribution de rôle) par un administrateur.
+        $bootstrap = !User::query()->withTrashed()->exists();
+        // Rôle aux droits les plus restreints (aucune écriture sans mouvement attribué)
+        $data['role']   = $bootstrap ? 'admin' : 'movement_leader';
+        $data['status'] = $bootstrap ? 'active' : 'inactive';
+
         $user = User::create($data);
+
+        if (!$bootstrap) {
+            return (new UserResource($user))
+                ->additional(['message' => 'Compte créé. Il doit être activé par un administrateur avant la première connexion.'])
+                ->response()
+                ->setStatusCode(Response::HTTP_CREATED);
+        }
 
         $token = $user->createToken('api_token')->plainTextToken;
 
@@ -50,6 +66,14 @@ class AuthController extends Controller
                 'message' => 'Identifiants invalides'
             ], Response::HTTP_UNAUTHORIZED);
         }
+
+        if ($user->isDisabled()) {
+            return response()->json([
+                'error' => 'Ce compte est désactivé. Contactez un administrateur.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $user->forceFill(['last_login_at' => now()])->saveQuietly();
 
         $token = $user->createToken('api_token')->plainTextToken;
 

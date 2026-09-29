@@ -21,12 +21,17 @@ class SettingController extends Controller
         $grouped = [];
         foreach ($all as $s) {
             $grouped[$s->group] ??= [];
-            $grouped[$s->group][] = [
+            $item = [
                 'key'   => $s->key,
                 'value' => $this->exposedValue($s),
                 'type'  => $s->type,
                 'label' => $s->label,
             ];
+            // Paramètre secret : jamais renvoyé, seulement l'indication qu'il est renseigné
+            if ($s->isSecret()) {
+                $item['is_set'] = filled($s->value);
+            }
+            $grouped[$s->group][] = $item;
         }
 
         return response()->json(['data' => $grouped]);
@@ -64,12 +69,44 @@ class SettingController extends Controller
             'settings.*.value' => 'nullable|string',
         ]);
 
-        foreach ($request->input('settings', []) as $item) {
-            $setting = Setting::find($item['key']);
-            if ($setting) {
-                $setting->value = $item['value'] ?? null;
-                $setting->save();
+        $items = $request->input('settings', []);
+        $settings = Setting::whereIn('key', array_column($items, 'key'))->get()->keyBy('key');
+
+        // Contrôle par clé (tout ou rien) : payment.* / whatsapp.* / secrets → admin, etc.
+        foreach ($items as $item) {
+            $setting = $settings->get($item['key']);
+            if ($setting && !$request->user()->hasRole(...Setting::editorRoles($setting->key, $setting->type))) {
+                return response()->json(['error' => 'Accès refusé pour votre rôle.'], 403);
             }
+            if ($setting && $setting->type === 'json' && filled($item['value'] ?? null)) {
+                json_decode($item['value']);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    return response()->json([
+                        'message' => 'Valeur JSON invalide pour « ' . ($setting->label ?: $setting->key) . ' ».',
+                        'errors'  => ['settings' => ['Valeur JSON invalide pour ' . $setting->key . '.']],
+                    ], 422);
+                }
+            }
+        }
+
+        foreach ($items as $item) {
+            $setting = $settings->get($item['key']);
+            if (!$setting) {
+                continue;
+            }
+
+            $value = $item['value'] ?? null;
+
+            // Secret : une valeur vide ne l'efface pas (le formulaire reçoit toujours null)
+            if ($setting->isSecret() && blank($value)) {
+                continue;
+            }
+            if ($setting->type === 'boolean' && $value !== null) {
+                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN) ? '1' : '0';
+            }
+
+            $setting->value = $value;
+            $setting->save();
         }
 
         return response()->json([
@@ -94,6 +131,9 @@ class SettingController extends Controller
         if (!$setting || $setting->type !== 'image') {
             return response()->json(['error' => 'Clé invalide pour une image'], 422);
         }
+        if (!$request->user()->hasRole(...Setting::editorRoles($setting->key, $setting->type))) {
+            return response()->json(['error' => 'Accès refusé pour votre rôle.'], 403);
+        }
 
         // Supprimer ancienne image
         if ($setting->value) {
@@ -106,6 +146,15 @@ class SettingController extends Controller
         $path = $request->file('image')->store('settings', 'public');
         $setting->value = 'storage/' . $path;
         $setting->save();
+
+        // Logo personnalisé : l'accueil bascule sur le logo téléversé
+        if ($setting->key === 'images.logo') {
+            $flag = Setting::find('images.logo_custom');
+            if ($flag && $flag->value !== '1') {
+                $flag->value = '1';
+                $flag->save();
+            }
+        }
 
         return response()->json([
             'status' => 'success',
@@ -130,6 +179,9 @@ class SettingController extends Controller
         $setting = Setting::find($request->input('key'));
         if (!$setting || $setting->type !== 'file') {
             return response()->json(['error' => 'Clé invalide pour un fichier'], 422);
+        }
+        if (!$request->user()->hasRole(...Setting::editorRoles($setting->key, $setting->type))) {
+            return response()->json(['error' => 'Accès refusé pour votre rôle.'], 403);
         }
 
         // Supprimer l'ancien fichier
@@ -158,6 +210,10 @@ class SettingController extends Controller
      */
     private function exposedValue(Setting $s): ?string
     {
+        if ($s->isSecret()) {
+            return null;
+        }
+
         if (in_array($s->type, ['image', 'file'], true) && $s->value) {
             return str_starts_with($s->value, 'http')
                 ? $s->value
