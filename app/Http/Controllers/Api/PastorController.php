@@ -65,6 +65,7 @@ class PastorController extends Controller
     public function store(StoreRequest $request)
     {
         $data = $request->validated();
+        $data['description'] = $data['description'] ?? '';
 
         // Gérer l'upload d'image
         if ($request->hasFile('photo')) {
@@ -98,6 +99,9 @@ class PastorController extends Controller
     public function update(UpdateRequest $request, string $id)
     {
         $data = $request->validated();
+        if (array_key_exists('description', $data)) {
+            $data['description'] = $data['description'] ?? '';
+        }
 
         $pastor = $this->repo->find($id); // récupérer l'événement existant
 
@@ -106,8 +110,9 @@ class PastorController extends Controller
             $photo = $request->file('photo');
 
             // Supprimer l'ancienne image si elle existe
-            if ($pastor->photo && Storage::disk('public')->exists($pastor->photo)) {
-                Storage::disk('public')->delete($pastor->photo);
+            $ancienne = $pastor->photo ? preg_replace('#^storage/#', '', $pastor->photo) : null;
+            if ($ancienne && Storage::disk('public')->exists($ancienne)) {
+                Storage::disk('public')->delete($ancienne);
             }
 
             // Stocker la nouvelle image

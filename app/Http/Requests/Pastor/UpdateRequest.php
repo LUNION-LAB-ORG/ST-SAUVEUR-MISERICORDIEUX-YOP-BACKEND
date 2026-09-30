@@ -15,10 +15,10 @@ class UpdateRequest extends FormRequest
     {
         return [
             'fullname'    => 'sometimes|string|max:150',
-            'photo'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'photo'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'started_at'  => 'sometimes|date',
             'ended_at'    => 'nullable|date',
-            'description' => 'sometimes|string',
+            'description' => 'sometimes|nullable|string|max:2000',
         ];
     }
 }

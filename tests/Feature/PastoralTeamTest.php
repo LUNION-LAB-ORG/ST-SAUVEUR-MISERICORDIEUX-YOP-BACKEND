@@ -69,4 +69,19 @@ class PastoralTeamTest extends TestCase
         $listen = Listen::where('fullname', 'Marie')->first();
         $this->getJson("/api/listens/{$listen->id}")->assertJsonPath('data.priest.fullname', 'Père Paul');
     }
+
+    public function test_pastors_history_listing_and_optional_description(): void
+    {
+        $this->postJson('/api/pastors', ['fullname' => 'X', 'started_at' => '2001-01-01'])->assertUnauthorized();
+
+        Sanctum::actingAs(User::factory()->create(['role' => 'communication', 'status' => 'active']));
+        $this->postJson('/api/pastors', ['fullname' => 'Père Deux', 'started_at' => '2012-09-01', 'ended_at' => '2020-08-31'])->assertCreated();
+        $premier = $this->postJson('/api/pastors', ['fullname' => 'Père Un', 'started_at' => '1998-09-01', 'ended_at' => '2012-08-31', 'description' => 'Fondateur'])
+            ->assertCreated()->json('data.id');
+        $this->postJson("/api/pastors/{$premier}", ['_method' => 'PUT', 'description' => null])->assertOk()->assertJsonPath('data.description', '');
+
+        $this->app['auth']->forgetGuards();
+        $noms = collect($this->getJson('/api/pastors?per_page=100&sort_by=started_at&sort_dir=asc')->assertOk()->json('data'))->pluck('fullname')->all();
+        $this->assertSame(['Père Un', 'Père Deux'], $noms);
+    }
 }

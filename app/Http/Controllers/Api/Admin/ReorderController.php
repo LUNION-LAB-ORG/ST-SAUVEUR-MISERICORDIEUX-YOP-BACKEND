@@ -20,7 +20,7 @@ class ReorderController extends Controller
     private const RESOURCES = [
         'services'           => [Service::class, [], 'mouvements'],
         'priests'            => [Priest::class, [], 'équipe pastorale'],
-        'history-milestones' => [HistoryMilestone::class, ['communication'], 'jalons de l’histoire'],
+        'history-milestones' => [HistoryMilestone::class, ['communication', 'priest'], 'jalons de l’histoire'],
         'announcements'      => [Announcement::class, ['secretariat'], 'annonces'],
         'councils'           => [Council::class, [], 'conseils et services'],
     ];

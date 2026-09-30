@@ -105,7 +105,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Médiations, actualités, pasteurs (historique), programmations : communication
     Route::apiResource('mediations', MediationController::class)->only('store', 'update', 'destroy')->middleware('role:communication');
     Route::apiResource('news', NewsController::class)->only('store', 'update', 'destroy')->middleware('role:communication');
-    Route::apiResource('pastors', PastorController::class)->only('store', 'update', 'destroy')->middleware('role:communication');
+    Route::apiResource('pastors', PastorController::class)->only('store', 'update', 'destroy')->middleware('role:communication,priest');
     Route::apiResource('programmations', ProgrammationController::class)->only('show');
     Route::apiResource('programmations', ProgrammationController::class)->only('store', 'update', 'destroy')->middleware('role:secretariat,communication');
 
@@ -159,7 +159,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::apiResource('councils', CouncilController::class)->only('store', 'update', 'destroy')->middleware('role:admin');
 
     // Histoire (jalons) : communication
-    Route::apiResource('history-milestones', HistoryMilestoneController::class)->only('store', 'update', 'destroy')->middleware('role:communication');
+    Route::apiResource('history-milestones', HistoryMilestoneController::class)->only('store', 'update', 'destroy')->middleware('role:communication,priest');
 
     // Annonces : secrétariat
     Route::apiResource('announcements', AnnouncementController::class)->only('store', 'update', 'destroy')->middleware('role:secretariat');
