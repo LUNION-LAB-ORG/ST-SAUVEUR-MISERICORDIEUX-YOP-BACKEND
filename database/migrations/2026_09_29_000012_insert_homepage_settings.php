@@ -13,7 +13,7 @@ return new class extends Migration {
     {
         return [
             ['key' => 'parish.tagline', 'group' => 'parish', 'type' => 'text', 'label' => 'Devise', 'value' => 'Le Sanctuaire de la Miséricorde'],
-            ['key' => 'parish.diocese', 'group' => 'parish', 'type' => 'text', 'label' => 'Diocèse', 'value' => 'Archidiocèse d’Abidjan'],
+            ['key' => 'parish.diocese', 'group' => 'parish', 'type' => 'text', 'label' => 'Diocèse', 'value' => 'Diocèse de Yopougon'],
             ['key' => 'images.church_render', 'group' => 'images', 'type' => 'image', 'label' => "Vue d'architecte de la future église", 'value' => ''],
             ['key' => 'pastor_word.message', 'group' => 'pastor_word', 'type' => 'textarea', 'label' => 'Mot du curé', 'value' => ''],
             ['key' => 'pastor_word.signature', 'group' => 'pastor_word', 'type' => 'text', 'label' => 'Signature du mot du curé', 'value' => ''],
