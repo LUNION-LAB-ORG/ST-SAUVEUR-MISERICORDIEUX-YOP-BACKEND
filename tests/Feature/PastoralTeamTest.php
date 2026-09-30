@@ -23,7 +23,7 @@ class PastoralTeamTest extends TestCase
         $this->getJson('/api/councils')->assertOk()->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0', [
                 'id' => 2, 'name' => 'Conseil pastoral', 'role' => 'Orientations', 'leader_title' => 'Coordinateur',
-                'leader_name' => 'Awa K.', 'status' => 'published', 'sort_order' => 1,
+                'leader_name' => 'Awa K.', 'status' => 'published', 'sort_order' => 1, 'members' => [],
             ]);
         $this->getJson("/api/councils/{$draft->id}")->assertNotFound();
         $this->postJson('/api/councils', ['name' => 'X'])->assertUnauthorized();

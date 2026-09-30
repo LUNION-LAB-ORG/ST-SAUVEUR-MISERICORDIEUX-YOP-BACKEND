@@ -18,4 +18,9 @@ class Council extends Model
     protected $casts = [
         'sort_order' => 'int',
     ];
+
+    public function members()
+    {
+        return $this->hasMany(CouncilMember::class)->orderBy('sort_order')->orderBy('id');
+    }
 }
