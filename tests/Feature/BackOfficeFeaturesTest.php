@@ -149,6 +149,28 @@ class BackOfficeFeaturesTest extends TestCase
         $this->postJson("/api/publications/{$publication->id}/comments", ['author' => 'A', 'content' => 'x'])->assertUnprocessable();
     }
 
+    public function test_hero_banner_settings_are_editable_and_links_validated(): void
+    {
+        $this->assertSame('/nouvelle-eglise', Setting::find('hero.primary_url')->value);
+
+        $this->admin('communication');
+        $carte = $this->putJson('/api/settings', ['settings' => [
+            ['key' => 'hero.eyebrow', 'value' => 'Bienvenue'],
+            ['key' => 'hero.title', 'value' => 'Saint Sauveur'],
+            ['key' => 'hero.image_caption', 'value' => 'Maquette 2026'],
+            ['key' => 'hero.link_url', 'value' => 'https://exemple.ci/projet'],
+            ['key' => 'hero.secondary_url', 'value' => '/agenda'],
+        ]])->assertOk()->json('data');
+        $this->assertSame('Saint Sauveur', $carte['hero.title']);
+        $this->assertSame('/agenda', $carte['hero.secondary_url']);
+
+        foreach (['javascript:alert(1)', '//evil.test', 'ftp://x'] as $lien) {
+            $this->putJson('/api/settings', ['settings' => [['key' => 'hero.primary_url', 'value' => $lien]]])
+                ->assertUnprocessable();
+        }
+        $this->assertSame('/nouvelle-eglise', Setting::find('hero.primary_url')->value);
+    }
+
     public function test_secret_setting_is_never_exposed(): void
     {
         $this->admin();

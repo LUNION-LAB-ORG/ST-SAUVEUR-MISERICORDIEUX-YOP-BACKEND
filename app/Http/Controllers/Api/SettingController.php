@@ -78,6 +78,14 @@ class SettingController extends Controller
             if ($setting && !$request->user()->hasRole(...Setting::editorRoles($setting->key, $setting->type))) {
                 return response()->json(['error' => 'Accès refusé pour votre rôle.'], 403);
             }
+            // Liens de la bannière : chemin interne (/…) ou adresse http(s) uniquement
+            if (str_starts_with($item['key'], 'hero.') && str_ends_with($item['key'], '_url') && filled($item['value'] ?? null)
+                && !preg_match('#^(/(?!/)|https?://)\S*$#i', trim($item['value']))) {
+                return response()->json([
+                    'message' => 'Lien invalide : indiquez une page du site (/…) ou une adresse https://…',
+                    'errors'  => ['settings' => ['Lien invalide pour ' . $item['key'] . '.']],
+                ], 422);
+            }
             if ($setting && $setting->type === 'json' && filled($item['value'] ?? null)) {
                 json_decode($item['value']);
                 if (json_last_error() !== JSON_ERROR_NONE) {
