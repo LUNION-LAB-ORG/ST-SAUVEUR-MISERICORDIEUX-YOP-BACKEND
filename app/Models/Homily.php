@@ -24,8 +24,32 @@ class Homily extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'priest_id' => 'int',
+        'priest_id'       => 'int',
+        'publish_at'      => 'datetime',
+        'notify_whatsapp' => 'bool',
     ];
+
+    /** Visible publiquement : publiée et date de publication atteinte (ou non programmée). */
+    public function scopeVisible(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->published()
+            ->where(fn ($q) => $q->whereNull('publish_at')->orWhere('publish_at', '<=', now()));
+    }
+
+    public function isVisible(): bool
+    {
+        return $this->isPublished() && (!$this->publish_at || $this->publish_at->lte(now()));
+    }
+
+    /** État calculé : draft | scheduled | published. */
+    public function state(): string
+    {
+        if (!$this->isPublished()) {
+            return 'draft';
+        }
+
+        return $this->publish_at && $this->publish_at->gt(now()) ? 'scheduled' : 'published';
+    }
 
     public function priest()
     {

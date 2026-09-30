@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\ResolvesPublicationScope;
+use App\Http\Controllers\Concerns\StoresPublicImages;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Homily\StoreRequest;
 use App\Http\Requests\Homily\UpdateRequest;
@@ -13,7 +14,7 @@ use Illuminate\Http\Response;
 
 class HomilyController extends Controller
 {
-    use ResolvesPublicationScope;
+    use ResolvesPublicationScope, StoresPublicImages;
 
     protected HomilyRepositoryInterface $repo;
 
@@ -30,7 +31,11 @@ class HomilyController extends Controller
     {
         $request->validate(['date' => 'nullable|date_format:Y-m-d']);
 
-        $query = $this->applyPublicationScope($this->repo->query()->with('priest'), $request);
+        $query = $this->repo->query()->with('priest');
+        if (!$this->wantsAllStatuses($request)) {
+            // Publiées et date de publication atteinte (homélies programmées masquées)
+            $query->visible();
+        }
 
         if ($request->filled('date')) {
             $query->where('date', $request->input('date'));
@@ -53,7 +58,7 @@ class HomilyController extends Controller
     public function show(string $id)
     {
         $homily = $this->repo->find($id, ['priest']);
-        $this->ensureVisible($homily);
+        abort_if(!$this->isAdmin() && !$homily->isVisible(), 404);
 
         return new HomilyResource($homily);
     }
@@ -64,6 +69,37 @@ class HomilyController extends Controller
         $homily = $this->repo->update($homily->id, $request->validated());
 
         return new HomilyResource($homily->load('priest'));
+    }
+
+    /**
+     * Enregistrement audio de l'homélie (admin). Multipart : `audio` (mp3, m4a — 20 Mo max).
+     */
+    public function uploadAudio(Request $request, string $id)
+    {
+        $request->validate([
+            'audio' => [
+                'required', 'file', 'max:20480',
+                // mp3 est détecté « mpga », m4a « mp4 » selon le type MIME : on accepte ces alias
+                'mimetypes:audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/m4a,audio/aac,video/mp4',
+                function ($attribute, $file, $fail) {
+                    if (!in_array(strtolower($file->getClientOriginalExtension()), ['mp3', 'm4a'], true)) {
+                        $fail('Le fichier audio doit être au format mp3 ou m4a.');
+                    }
+                },
+            ],
+        ]);
+
+        $homily = $this->repo->find($id);
+        $this->deletePublicImage($homily->audio_url);
+
+        $path = 'storage/' . $request->file('audio')->storeAs(
+            'homilies/audio',
+            \Illuminate\Support\Str::random(40) . '.' . strtolower($request->file('audio')->getClientOriginalExtension()),
+            'public'
+        );
+        $homily->update(['audio_url' => $path]);
+
+        return new HomilyResource($homily->fresh('priest'));
     }
 
     public function destroy(string $id)

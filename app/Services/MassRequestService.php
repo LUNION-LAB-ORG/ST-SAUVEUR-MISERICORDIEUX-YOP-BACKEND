@@ -142,7 +142,7 @@ class MassRequestService
      * @return array<int, array{date:string,time:string,time_slot_id:int,label:string,shifted:bool}>
      * @throws ValidationException
      */
-    public function plan(Carbon $date, int $timeSlotId, int $count): array
+    public function plan(Carbon $date, int $timeSlotId, int $count, bool $enforceDelay = true): array
     {
         $settings = $this->settings();
 
@@ -152,7 +152,7 @@ class MassRequestService
         }
 
         $info = $this->slotInfo($date, $slot, $settings);
-        if ($info['status'] === 'too_late') {
+        if ($enforceDelay && $info['status'] === 'too_late') {
             throw ValidationException::withMessages([
                 'date' => "La première messe doit avoir lieu au moins {$settings['min_delay_hours']} heures après votre demande.",
             ]);
@@ -209,15 +209,15 @@ class MassRequestService
      * sous verrou (transaction + lockForUpdate) ; l'index unique garantit l'absence de doublon
      * et une collision éventuelle est rejouée.
      */
-    public function create(array $attributes, Carbon $date, int $timeSlotId, int $count): Mess
+    public function create(array $attributes, Carbon $date, int $timeSlotId, int $count, bool $enforceDelay = true): Mess
     {
         for ($attempt = 1; ; $attempt++) {
             try {
-                return DB::transaction(function () use ($attributes, $date, $timeSlotId, $count) {
+                return DB::transaction(function () use ($attributes, $date, $timeSlotId, $count, $enforceDelay) {
                     $number = $this->nextNumber((int) Carbon::now(self::TIMEZONE)->year);
 
                     // Programmation sous le même verrou : la capacité est vérifiée au plus juste
-                    $schedules = $this->plan($date, $timeSlotId, $count);
+                    $schedules = $this->plan($date, $timeSlotId, $count, $enforceDelay);
                     $first = $schedules[0];
 
                     $mess = Mess::create($attributes + [
@@ -248,6 +248,52 @@ class MassRequestService
                 }
             }
         }
+    }
+
+    /**
+     * Déplace une messe programmée (admin) : le créneau doit être célébré ce jour-là et non complet.
+     *
+     * @throws ValidationException
+     */
+    public function move(MassSchedule $schedule, Carbon $date, int $timeSlotId): MassSchedule
+    {
+        return DB::transaction(function () use ($schedule, $date, $timeSlotId) {
+            $slot = $this->celebratedSlots($date)->firstWhere('id', $timeSlotId);
+            if (!$slot) {
+                throw ValidationException::withMessages(['time_slot_id' => 'Aucune messe n’est célébrée sur ce créneau à cette date.']);
+            }
+
+            $taken = MassSchedule::query()
+                ->where('date', $date->toDateString())
+                ->where('time_slot_id', $slot->id)
+                ->where('id', '!=', $schedule->id)
+                ->occupying()
+                ->count();
+            if ($slot->capacity !== null && $taken >= (int) $slot->capacity) {
+                throw ValidationException::withMessages(['time_slot_id' => 'Ce créneau est complet.']);
+            }
+
+            $schedule->update([
+                'date'         => $date->toDateString(),
+                'time'         => self::slotTime($slot) . ':00',
+                'time_slot_id' => $slot->id,
+                'label'        => $slot->label ?: 'Messe',
+                'shifted'      => false,
+            ]);
+
+            // La date de la demande reste celle de sa première messe
+            $mess = $schedule->mess;
+            $first = $mess->schedules()->reorder()->orderBy('date')->orderBy('time')->first();
+            if ($first) {
+                $mess->forceFill([
+                    'date_at'      => $first->date,
+                    'time_at'      => $first->time,
+                    'time_slot_id' => $first->time_slot_id,
+                ])->saveQuietly();
+            }
+
+            return $schedule->fresh();
+        });
     }
 
     /** Prochain numéro de l'année, verrouillé jusqu'à la fin de la transaction. */

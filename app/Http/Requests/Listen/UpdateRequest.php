@@ -19,10 +19,12 @@ class UpdateRequest extends FormRequest
             'phone'          => 'sometimes|nullable|string|max:60',
             'message'        => 'sometimes|nullable|string',
             'priest_id'      => 'sometimes|nullable|integer|exists:priests,id',
+            'assigned_priest_id' => 'sometimes|nullable|integer|exists:priests,id',
+            'proposed_at'    => 'sometimes|nullable|date',
             'availability'   => 'sometimes|nullable|string|max:100',
             'time_slot_id'   => 'sometimes|nullable|integer|exists:time_slots,id',
             'listen_at'      => 'sometimes|nullable|date',
-            'request_status' => 'sometimes|string|in:pending,accepted,canceled',
+            'request_status' => 'sometimes|string|in:pending,accepted,canceled,confirmed,closed',
         ];
     }
 }

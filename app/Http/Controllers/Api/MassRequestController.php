@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\MassRequest\AdminStoreRequest;
 use App\Http\Requests\MassRequest\StoreRequest;
+use App\Http\Resources\MessResource;
 use App\Models\MassSchedule;
 use App\Models\Mess;
 use App\Services\MassRequestService;
@@ -57,33 +59,7 @@ class MassRequestController extends Controller
             return response()->json(['error' => 'Configuration Wave manquante. Contactez l\'administrateur.'], 500);
         }
 
-        $formula = $data['formula'] ?? 'single';
-        $count = MassRequestService::FORMULAS[$formula];
-        $amount = $this->offeringAmount($data, $count);
-
-        if ($data['payment_method'] === 'wave' && $amount < 100) {
-            throw ValidationException::withMessages(['amount' => 'Le paiement Wave requiert une offrande d’au moins 100 FCFA.']);
-        }
-
-        $date = Carbon::createFromFormat('!Y-m-d', $data['date'], MassRequestService::TIMEZONE);
-
-        $mess = $this->service->create([
-            'type'            => $data['intention_type'],
-            'intention_type'  => $data['intention_type'],
-            'for_whom'        => $data['for_whom'],
-            'message'         => $data['intention'] ?? null,
-            'is_confidential' => (bool) ($data['is_confidential'] ?? false),
-            'formula'         => $formula,
-            'fullname'        => $data['fullname'],
-            'phone'           => $data['phone'],
-            'email'           => $data['email'] ?? null,
-            'will_attend'     => (bool) ($data['will_attend'] ?? false),
-            'reminder'        => (bool) ($data['reminder'] ?? true),
-            'amount'          => $amount,
-            'payment_method'  => $data['payment_method'],
-            'payment_status'  => $data['payment_method'] === 'secretariat' ? 'to_pay' : 'pending',
-            'request_status'  => 'pending',
-        ], $date, (int) $data['time_slot_id'], $count);
+        $mess = $this->createRequest($data, $data['payment_method'] === 'secretariat' ? 'to_pay' : 'pending');
 
         $launchUrl = null;
 
@@ -176,7 +152,88 @@ class MassRequestController extends Controller
         return response()->json(['data' => $groups]);
     }
 
+    /**
+     * Saisie d'une demande au secrétariat (admin) : sans délai minimal ; « cash » = déjà encaissée.
+     */
+    public function adminStore(AdminStoreRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $status = $data['payment_status']
+            ?? ($data['payment_method'] === 'cash' ? 'succeeded' : 'to_pay');
+
+        $mess = $this->createRequest($data, $status, false);
+
+        return response()->json(['data' => $this->payload($mess->fresh('schedules'), null, true)], 201);
+    }
+
+    /**
+     * Déplacement d'une messe programmée (admin). PUT /mass-schedules/{id} { date, time_slot_id }
+     */
+    public function moveSchedule(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'date'         => 'required|date_format:Y-m-d',
+            'time_slot_id' => 'required|integer|exists:time_slots,id',
+        ]);
+
+        $schedule = MassSchedule::with('mess')->findOrFail($id);
+        $schedule = $this->service->move(
+            $schedule,
+            Carbon::createFromFormat('!Y-m-d', $data['date'], MassRequestService::TIMEZONE),
+            (int) $data['time_slot_id']
+        );
+
+        \App\Services\ActivityLogger::log('updated', $schedule->mess, sprintf(
+            'Messe de la demande %s déplacée au %s à %s',
+            $schedule->mess->number ?: 'n° ' . $schedule->mess->id,
+            Carbon::parse($schedule->date)->format('d/m/Y'),
+            $schedule->hhmm()
+        ));
+
+        return response()->json(['data' => [
+            'id'           => $schedule->id,
+            'mess_id'      => $schedule->mess_id,
+            'date'         => $schedule->date,
+            'time'         => $schedule->hhmm(),
+            'time_slot_id' => $schedule->time_slot_id,
+            'label'        => $schedule->label,
+            'shifted'      => (bool) $schedule->shifted,
+        ]]);
+    }
+
     /* ============== Helpers privés ============== */
+
+    /** Crée la demande et ses messes programmées (offrande calculée, numéro attribué). */
+    private function createRequest(array $data, string $paymentStatus, bool $enforceDelay = true): Mess
+    {
+        $formula = $data['formula'] ?? 'single';
+        $count = MassRequestService::FORMULAS[$formula];
+        $amount = $this->offeringAmount($data, $count);
+
+        if ($data['payment_method'] === 'wave' && $amount < 100) {
+            throw ValidationException::withMessages(['amount' => 'Le paiement Wave requiert une offrande d’au moins 100 FCFA.']);
+        }
+
+        $date = Carbon::createFromFormat('!Y-m-d', $data['date'], MassRequestService::TIMEZONE);
+
+        return $this->service->create([
+            'type'            => $data['intention_type'],
+            'intention_type'  => $data['intention_type'],
+            'for_whom'        => $data['for_whom'],
+            'message'         => $data['intention'] ?? null,
+            'is_confidential' => (bool) ($data['is_confidential'] ?? false),
+            'formula'         => $formula,
+            'fullname'        => $data['fullname'],
+            'phone'           => $data['phone'],
+            'email'           => $data['email'] ?? null,
+            'will_attend'     => (bool) ($data['will_attend'] ?? false),
+            'reminder'        => (bool) ($data['reminder'] ?? true),
+            'amount'          => $amount,
+            'payment_method'  => $data['payment_method'],
+            'payment_status'  => $paymentStatus,
+            'request_status'  => 'pending',
+        ], $date, (int) $data['time_slot_id'], $count, $enforceDelay);
+    }
 
     /** Offrande totale : indicative × nombre de messes, ou montant libre ≥ minimum. */
     private function offeringAmount(array $data, int $count): int

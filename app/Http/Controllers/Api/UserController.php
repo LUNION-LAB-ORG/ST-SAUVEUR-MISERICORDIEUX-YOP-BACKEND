@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\User\StoreRequest;
 use App\Http\Requests\User\UpdateRequest;
 use App\Http\Resources\UserResource;
+use App\Models\User;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -66,6 +67,15 @@ class UserController extends Controller
     {
         $data = $request->validated();
 
+        // Rôle non fourni : valeur par défaut de la colonne (comportement historique)
+        if (array_key_exists('role', $data) && $data['role'] === null) {
+            unset($data['role']);
+        }
+        // Valeur historique « inactive » conservée ; « disabled » accepté comme synonyme
+        if (($data['status'] ?? null) === 'disabled') {
+            $data['status'] = 'inactive';
+        }
+
         // Hash password
         if (isset($data['password'])) {
             $data['password'] = bcrypt($data['password']);
@@ -108,6 +118,19 @@ class UserController extends Controller
 
         $existing = $this->repo->find($id);
 
+        if (array_key_exists('role', $data) && $data['role'] === null) {
+            unset($data['role']);
+        }
+        // Valeur historique « inactive » conservée ; « disabled » accepté comme synonyme
+        if (($data['status'] ?? null) === 'disabled') {
+            $data['status'] = 'inactive';
+        }
+
+        // Garde-fous : pas d'auto-désactivation, jamais sans administrateur actif
+        if ($error = $this->guardAdminChange($request->user(), $existing, $data)) {
+            return response()->json(['error' => $error], 422);
+        }
+
         // Upload photo
         if ($request->hasFile('photo')) {
             if ($existing && $existing->photo) {
@@ -121,6 +144,12 @@ class UserController extends Controller
         }
 
         $user = $this->repo->update($id, $data);
+
+        // Compte désactivé : tous ses jetons sont révoqués
+        if ($user->isDisabled()) {
+            $user->tokens()->delete();
+        }
+
         return new UserResource($user);
     }
 
@@ -178,13 +207,47 @@ class UserController extends Controller
     /**
      * Soft delete user
      */
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
+        $user = $this->repo->find($id);
+
+        if ($request->user() && $request->user()->id === $user->id) {
+            return response()->json(['error' => 'Vous ne pouvez pas supprimer votre propre compte.'], 422);
+        }
+        if ($user->isAdmin() && !$user->isDisabled() && $this->activeAdminCount() <= 1) {
+            return response()->json(['error' => 'Impossible de supprimer le dernier administrateur actif.'], 422);
+        }
+
+        $user->tokens()->delete();
         $this->repo->delete($id);
 
         return response()->json([
             'status'  => 'success',
             'message' => 'Utilisateur supprimé'
         ], Response::HTTP_NO_CONTENT);
+    }
+
+    /**
+     * Un admin ne peut pas se désactiver, et le dernier admin actif ne peut pas perdre son rôle.
+     */
+    private function guardAdminChange(?User $actor, User $target, array $data): ?string
+    {
+        $disabling = isset($data['status']) && in_array($data['status'], User::DISABLED_STATUSES, true);
+        $demoting  = isset($data['role']) && $data['role'] !== 'admin';
+
+        if ($actor && $actor->id === $target->id && $disabling) {
+            return 'Vous ne pouvez pas désactiver votre propre compte.';
+        }
+
+        if ($target->isAdmin() && !$target->isDisabled() && ($disabling || $demoting) && $this->activeAdminCount() <= 1) {
+            return 'Impossible : ce compte est le dernier administrateur actif.';
+        }
+
+        return null;
+    }
+
+    private function activeAdminCount(): int
+    {
+        return User::where('role', 'admin')->whereNotIn('status', User::DISABLED_STATUSES)->count();
     }
 }

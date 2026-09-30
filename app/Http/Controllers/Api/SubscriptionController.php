@@ -30,17 +30,20 @@ class SubscriptionController extends Controller
 
         $subscriber = $this->repo->query()->where('phone', $data['phone'])->first();
 
+        $source = $data['source'] ?? null;
+
         if ($subscriber) {
             $subscriber->update([
                 'lists'           => $lists,
                 'consented_at'    => now(),
                 'unsubscribed_at' => null,
-            ]);
+            ] + ($source ? ['source' => $source] : []));
         } else {
             $subscriber = $this->repo->create([
                 'phone'        => $data['phone'],
                 'lists'        => $lists,
                 'consented_at' => now(),
+                'source'       => $source,
             ]);
         }
 
@@ -104,6 +107,28 @@ class SubscriptionController extends Controller
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * Statistiques (admin) : abonnés actifs par liste, désabonnements des 30 derniers jours.
+     */
+    public function stats()
+    {
+        $lists = array_fill_keys(WhatsappSubscriber::DEFAULT_LISTS, 0);
+
+        $this->repo->query()->whereNull('unsubscribed_at')->select(['id', 'lists'])
+            ->chunkById(500, function ($chunk) use (&$lists) {
+                foreach ($chunk as $subscriber) {
+                    foreach (array_unique($subscriber->lists ?? []) as $list) {
+                        $lists[$list] = ($lists[$list] ?? 0) + 1;
+                    }
+                }
+            });
+
+        return response()->json(['data' => [
+            'lists'            => $lists,
+            'unsubscribed_30d' => $this->repo->query()->where('unsubscribed_at', '>=', now()->subDays(30))->count(),
+        ]]);
     }
 
     private function filteredQuery(Request $request)

@@ -19,6 +19,8 @@ class StoreRequest extends FormRequest
             'title'             => 'required|string|max:255',
             'content'           => 'required|string',
             'audio_url'         => 'nullable|url|max:255',
+            'publish_at'        => 'nullable|date',
+            'notify_whatsapp'   => 'sometimes|boolean',
             'status'            => 'sometimes|string|in:draft,published,hidden',
         ];
     }

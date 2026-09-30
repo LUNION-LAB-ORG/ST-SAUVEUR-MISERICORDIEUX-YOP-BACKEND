@@ -27,6 +27,7 @@ class StoreRequest extends FormRequest
             'lists'   => 'sometimes|array|min:1',
             'lists.*' => 'string|max:50',
             'consent' => 'accepted',
+            'source'  => 'nullable|string|max:50',
         ];
     }
 

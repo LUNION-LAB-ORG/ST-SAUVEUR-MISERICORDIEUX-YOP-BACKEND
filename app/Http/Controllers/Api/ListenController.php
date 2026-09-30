@@ -39,6 +39,10 @@ class ListenController extends Controller
             $conditions[] = ['phone', 'LIKE', '%' . $request->phone . '%'];
         }
 
+        if ($request->filled('request_status')) {
+            $conditions[] = ['request_status', '=', $request->request_status];
+        }
+
         if ($request->filled('time_slot_id')) {
             $conditions[] = ['time_slot_id', '=', $request->time_slot_id];
         }
@@ -52,7 +56,7 @@ class ListenController extends Controller
         }
 
         $listens = $this->repo->paginate(
-            with: ['timeSlot', 'priest'],
+            with: ['timeSlot', 'priest', 'assignedPriest'],
             page: (int) $request->input('per_page', 15),
             conditions: $conditions,
             skip: (int) $request->input('skip', 0),
@@ -69,6 +73,11 @@ class ListenController extends Controller
     public function store(StoreRequest $request)
     {
         $data = $request->validated();
+
+        // Demande publique : toujours « en attente » (le statut se gère depuis le back-office)
+        if (!auth('sanctum')->check()) {
+            $data['request_status'] = 'pending';
+        }
 
         // Validation : si un time_slot_id est fourni, il doit pointer un slot actif de type 'ecoute'
         if (!empty($data['time_slot_id'])) {
@@ -106,7 +115,7 @@ class ListenController extends Controller
      */
     public function show(string $id)
     {
-        return new ListenResource($this->repo->find($id, ['timeSlot', 'priest']));
+        return new ListenResource($this->repo->find($id, ['timeSlot', 'priest', 'assignedPriest']));
     }
 
     /**
@@ -115,7 +124,7 @@ class ListenController extends Controller
     public function update(UpdateRequest $request, string $id)
     {
         $listen = $this->repo->update($id, $request->validated());
-        return new ListenResource($listen);
+        return new ListenResource($listen->load(['timeSlot', 'priest', 'assignedPriest']));
     }
 
     /**

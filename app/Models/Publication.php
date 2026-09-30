@@ -25,6 +25,8 @@ class Publication extends Model
         'likes_count'  => 'int',
         'sort_order'   => 'int',
         'published_at' => 'datetime',
+        'allow_comments' => 'bool',
+        'show_likes'     => 'bool',
     ];
 
     protected $attributes = [

@@ -40,7 +40,7 @@ class LiturgyDayResource extends JsonResource
     private function homilyPayload(): ?array
     {
         $homily = Homily::query()
-            ->published()
+            ->visible()
             ->where('date', substr($this->date, 0, 10))
             ->with('priest')
             ->orderByDesc('id')
@@ -54,7 +54,7 @@ class LiturgyDayResource extends JsonResource
             'id'        => $homily->id,
             'title'     => $homily->title,
             'content'   => $homily->content,
-            'audio_url' => $homily->audio_url,
+            'audio_url' => \App\Support\MediaUrl::absolute($homily->audio_url),
             'author'    => $homily->priest ? [
                 'fullname' => $homily->priest->fullname,
                 'function' => $homily->priest->function,

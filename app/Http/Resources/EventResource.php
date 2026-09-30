@@ -18,6 +18,9 @@ class EventResource extends JsonResource
             'end_time'               => \App\Models\Event::hhmm($this->getRawOriginal('end_time') ?? $this->end_time),
             'programme'              => array_values($this->programme ?? []),
             'status'                 => $this->status ?? 'published',
+            'registrations_open'     => (bool) ($this->registrations_open ?? true),
+            'registrations_count'    => $this->activeRegistrations()->count(),
+            'attendees_count'        => (int) $this->activeRegistrations()->sum(fn ($p) => (int) ($p->attendees ?? 1)),
             'description'            => $this->description,
             'date_at'                => $this->date_at,
             'time_at'                => $this->time_at,
@@ -40,6 +43,16 @@ class EventResource extends JsonResource
 
             'created_at'    => optional($this->created_at)->toDateTimeString(),
         ];
+    }
+
+    /** Inscriptions actives (relation déjà chargée si possible, pour éviter une requête par ligne). */
+    private function activeRegistrations(): \Illuminate\Support\Collection
+    {
+        $participants = $this->relationLoaded('participants')
+            ? $this->participants
+            : $this->resource->participants()->get(['id', 'attendees', 'payment_status']);
+
+        return $participants->filter(fn ($p) => $p->payment_status !== 'failed')->values();
     }
 
     /**

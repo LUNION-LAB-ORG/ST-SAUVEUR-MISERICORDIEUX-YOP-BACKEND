@@ -38,7 +38,43 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'service_id' => 'int',
+        'last_login_at' => 'datetime',
     ];
+
+    /** Rôles du back-office (admin passe partout). */
+    public const ROLES = ['admin', 'priest', 'secretariat', 'communication', 'treasurer', 'movement_leader'];
+
+    /** Statuts qui bloquent la connexion (« inactive » ; « disabled » toléré comme synonyme). */
+    public const DISABLED_STATUSES = ['inactive', 'disabled'];
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /** Vrai si l'utilisateur a l'un des rôles donnés (l'admin a tous les rôles). */
+    public function hasRole(string ...$roles): bool
+    {
+        return $this->isAdmin() || in_array($this->role, $roles, true);
+    }
+
+    public function isDisabled(): bool
+    {
+        return in_array($this->status, self::DISABLED_STATUSES, true);
+    }
+
+    /** Nom affiché (fullname, sinon name). */
+    public function displayName(): ?string
+    {
+        return $this->fullname ?: $this->name;
+    }
+
+    /** Mouvement géré par un responsable de mouvement. */
+    public function service()
+    {
+        return $this->belongsTo(Service::class);
+    }
 
 	public function time_slots()
 	{

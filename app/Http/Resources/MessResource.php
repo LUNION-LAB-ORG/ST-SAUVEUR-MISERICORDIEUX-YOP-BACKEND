@@ -39,7 +39,9 @@ class MessResource extends JsonResource
             'reminder'         => (bool) ($this->reminder ?? true),
             'payment_method'   => $this->payment_method,
             'needs_review'     => (bool) $this->needs_review,
+            'time_slot'        => new TimeSlotResource($this->whenLoaded('timeSlot')),
             'schedules'        => $this->whenLoaded('schedules', fn () => $this->schedules->map(fn ($s) => [
+                'id'      => $s->id,
                 'date'    => $s->date,
                 'time'    => $s->hhmm(),
                 'label'   => $s->label,

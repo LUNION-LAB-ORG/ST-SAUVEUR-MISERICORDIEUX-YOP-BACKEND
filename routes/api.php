@@ -31,6 +31,10 @@ use App\Http\Controllers\Api\PublicationController;
 use App\Http\Controllers\Api\PublicationCommentController;
 use App\Http\Controllers\Api\CouncilController;
 use App\Http\Controllers\Api\MassRequestController;
+use App\Http\Controllers\Api\Admin\ActivityController as AdminActivityController;
+use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Api\Admin\IntegrationController as AdminIntegrationController;
+use App\Http\Controllers\Api\Admin\ReorderController as AdminReorderController;
 
 /*
 |--------------------------------------------------------------------------
@@ -48,7 +52,7 @@ Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('refresh', [AuthController::class, 'refresh']);
     });
@@ -69,116 +73,145 @@ Route::get('/time-slots/available', [\App\Http\Controllers\Api\TimeSlotControlle
 | API Routes (Protected)
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->group(function () {
+/*
+| Rôles (admin passe partout) — contrat « back-office » §1.
+| Les lectures (listes, détails, ?all=1, exports non financiers) restent ouvertes à tout
+| utilisateur connecté ; les écritures sont limitées par `role:…`.
+*/
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Profil utilisateur connecté
     Route::get('/me', [UserController::class, 'me']);
     Route::post('/me', [UserController::class, 'updateMe']); // POST avec _method=PUT pour multipart
 
-    // Users (admin)
-    Route::apiResource('users', UserController::class);
+    // Utilisateurs : administrateur uniquement (lecture comprise)
+    Route::apiResource('users', UserController::class)->middleware('role:admin');
 
-    // Donations
-    Route::apiResource('donations', DonationController::class);
+    // Dons : saisie (trésorier, secrétariat) ; export financier (admin, trésorier, secrétariat)
+    Route::get('/donations/export', [DonationController::class, 'export'])->middleware('role:treasurer,secretariat');
+    Route::apiResource('donations', DonationController::class)->only('index', 'show');
+    Route::apiResource('donations', DonationController::class)->only('store', 'update', 'destroy')->middleware('role:treasurer,secretariat');
 
-    // Events
-    Route::apiResource('events', EventController::class)->except('index');
+    // Événements (+ inscriptions) : communication
+    Route::get('/events/{id}/participants/export', [ParticipantEventController::class, 'exportForEvent']);
+    Route::get('/events/{id}/participants', [ParticipantEventController::class, 'forEvent']);
+    Route::apiResource('events', EventController::class)->only('store', 'update', 'destroy')->middleware('role:communication');
+    Route::apiResource('participants', ParticipantEventController::class)->only('index', 'show');
+    Route::apiResource('participants', ParticipantEventController::class)->only('update', 'destroy')->middleware('role:communication');
 
-    // Listens
-    Route::apiResource('listens', ListenController::class);
+    // Rendez-vous (écoutes) : prêtre, secrétariat
+    Route::apiResource('listens', ListenController::class)->only('index', 'show');
+    Route::apiResource('listens', ListenController::class)->only('update', 'destroy')->middleware('role:priest,secretariat');
 
-    // Mediations
-    Route::apiResource('mediations', MediationController::class);
+    // Médiations, actualités, pasteurs (historique), programmations : communication
+    Route::apiResource('mediations', MediationController::class)->only('store', 'update', 'destroy')->middleware('role:communication');
+    Route::apiResource('news', NewsController::class)->only('store', 'update', 'destroy')->middleware('role:communication');
+    Route::apiResource('pastors', PastorController::class)->only('store', 'update', 'destroy')->middleware('role:communication');
+    Route::apiResource('programmations', ProgrammationController::class)->only('show');
+    Route::apiResource('programmations', ProgrammationController::class)->only('store', 'update', 'destroy')->middleware('role:secretariat,communication');
 
-    // Messes
-    Route::apiResource('messes', MesseController::class);
+    // Demandes de messe : secrétariat (export avant la ressource)
+    Route::get('/messes/export', [MesseController::class, 'export'])->middleware('role:treasurer,secretariat');
+    Route::apiResource('messes', MesseController::class)->only('index', 'show');
+    Route::apiResource('messes', MesseController::class)->only('update', 'destroy')->middleware('role:secretariat');
 
-    // News
-    Route::apiResource('news', NewsController::class)->except('index');
+    // Mouvements : admin ; responsable de mouvement = sa seule fiche (contrôlé dans le contrôleur)
+    Route::apiResource('services', ServiceController::class)->only('store', 'destroy')->middleware('role:admin');
+    Route::apiResource('services', ServiceController::class)->only('update')->middleware('role:movement_leader');
 
-    // Pastors
-    Route::apiResource('pastors', PastorController::class)->except('index');
+    // Horaires : secrétariat
+    Route::apiResource('time-slots', TimeSlotController::class)->only('index', 'show');
+    Route::apiResource('time-slots', TimeSlotController::class)->only('store', 'update', 'destroy')->middleware('role:secretariat');
 
-    // Programmations
-    Route::apiResource('programmations', ProgrammationController::class)->except('index');
+    // Organisations (demandes d'événements) : communication
+    Route::apiResource('organisations', OrganisationController::class)->only('index', 'show');
+    Route::apiResource('organisations', OrganisationController::class)->only('update', 'destroy')->middleware('role:communication');
+    Route::post('/organisations/{id}/convert-to-event', [OrganisationController::class, 'convertToEvent'])->middleware('role:communication');
 
-    // Services
-    Route::apiResource('services', ServiceController::class)->except('index');
-
-    // Time Slots
-    Route::apiResource('time-slots', TimeSlotController::class);
-
-    Route::apiResource('participants', ParticipantEventController::class);
-
-    // Organisations — gestion admin (list/show/update/destroy)
-    Route::apiResource('organisations', OrganisationController::class)->except('store');
-
-    // Convertir une demande d'organisation acceptée en événement officiel
-    Route::post('/organisations/{id}/convert-to-event', [OrganisationController::class, 'convertToEvent']);
-
-    // Notifications admin
+    // Notifications admin (tout utilisateur connecté)
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 
-    // Paramètres admin (mutations)
+    // Paramètres : droits vérifiés clé par clé dans le contrôleur
     Route::put('/settings', [SettingController::class, 'updateMany']);
     Route::post('/settings/upload-image', [SettingController::class, 'uploadImage']);
+    Route::post('/settings/upload-file', [SettingController::class, 'uploadFile']);
 
     /*
-    | Refonte de l'accueil — mutations admin
-    | Routes spécifiques déclarées avant les apiResource qui pourraient les capturer.
+    | Refonte de l'accueil — routes spécifiques avant les apiResource qui pourraient les capturer.
     */
 
-    // Liturgie du jour (AELF)
+    // Liturgie du jour (AELF) : prêtre
     Route::get('/liturgy/days', [LiturgyController::class, 'days']);
-    Route::post('/liturgy/import', [LiturgyController::class, 'import']);
+    Route::post('/liturgy/import', [LiturgyController::class, 'import'])->middleware('role:priest');
     Route::put('/liturgy/{date}', [LiturgyController::class, 'update'])
-        ->where('date', '[0-9]{4}-[0-9]{2}-[0-9]{2}');
+        ->where('date', '[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        ->middleware('role:priest');
 
-    // Contenus éditoriaux
-    Route::apiResource('homilies', HomilyController::class)->except('index', 'show');
-    Route::apiResource('priests', PriestController::class)->except('index', 'show');
-    Route::apiResource('history-milestones', HistoryMilestoneController::class)->except('index', 'show');
-    Route::apiResource('announcements', AnnouncementController::class)->except('index', 'show');
+    // Homélies : prêtre
+    Route::post('/homilies/{id}/audio', [HomilyController::class, 'uploadAudio'])->middleware('role:priest');
+    Route::apiResource('homilies', HomilyController::class)->only('store', 'update', 'destroy')->middleware('role:priest');
 
-    // Projet « Nouvelle église »
-    Route::put('/church-project', [ChurchProjectController::class, 'update']);
-    Route::post('/church-project/gallery', [ChurchProjectController::class, 'addGalleryImage']);
-    Route::delete('/church-project/gallery/{index}', [ChurchProjectController::class, 'removeGalleryImage'])
-        ->whereNumber('index');
+    // Équipe pastorale et conseils : administrateur
+    Route::apiResource('priests', PriestController::class)->only('store', 'update', 'destroy')->middleware('role:admin');
+    Route::apiResource('councils', CouncilController::class)->only('store', 'update', 'destroy')->middleware('role:admin');
 
-    // Exceptions au planning hebdomadaire
-    Route::apiResource('schedule-exceptions', ScheduleExceptionController::class)->except('index', 'show');
+    // Histoire (jalons) : communication
+    Route::apiResource('history-milestones', HistoryMilestoneController::class)->only('store', 'update', 'destroy')->middleware('role:communication');
 
-    // Abonnés WhatsApp (export avant la liste)
+    // Annonces : secrétariat
+    Route::apiResource('announcements', AnnouncementController::class)->only('store', 'update', 'destroy')->middleware('role:secretariat');
+
+    // Projet « Nouvelle église » : trésorier
+    Route::middleware('role:treasurer')->group(function () {
+        Route::put('/church-project', [ChurchProjectController::class, 'update']);
+        Route::post('/church-project/gallery', [ChurchProjectController::class, 'addGalleryImage']);
+        Route::delete('/church-project/gallery/{index}', [ChurchProjectController::class, 'removeGalleryImage'])
+            ->whereNumber('index');
+    });
+
+    // Exceptions au planning hebdomadaire : secrétariat
+    Route::apiResource('schedule-exceptions', ScheduleExceptionController::class)->only('store', 'update', 'destroy')->middleware('role:secretariat');
+
+    // Abonnés WhatsApp (lecture ; export et stats avant la liste)
     Route::get('/subscriptions/export', [SubscriptionController::class, 'export']);
+    Route::get('/subscriptions/stats', [SubscriptionController::class, 'stats']);
     Route::get('/subscriptions', [SubscriptionController::class, 'index']);
 
     /*
-    | Sous-pages (lot 2) — mutations admin
+    | Sous-pages (lot 2)
     */
 
-    // Annonces : feuille d'annonces PDF (paramètre de type « file »)
-    Route::post('/settings/upload-file', [SettingController::class, 'uploadFile']);
+    // Publications : communication (le prêtre valide = modification)
+    Route::apiResource('publications', PublicationController::class)->only('store', 'destroy')->middleware('role:communication');
+    Route::apiResource('publications', PublicationController::class)->only('update')->middleware('role:communication,priest');
+    Route::middleware('role:communication')->group(function () {
+        Route::post('/publications/{id}/gallery', [PublicationController::class, 'addGalleryImage']);
+        Route::delete('/publications/{id}/gallery/{index}', [PublicationController::class, 'removeGalleryImage'])
+            ->whereNumber('index');
+    });
 
-    // Publications de la communauté + galerie
-    Route::apiResource('publications', PublicationController::class)->except('index', 'show');
-    Route::post('/publications/{id}/gallery', [PublicationController::class, 'addGalleryImage']);
-    Route::delete('/publications/{id}/gallery/{index}', [PublicationController::class, 'removeGalleryImage'])
-        ->whereNumber('index');
-
-    // Modération des commentaires
+    // Modération des commentaires : communication, prêtre
     Route::get('/comments', [PublicationCommentController::class, 'index']);
-    Route::put('/comments/{id}', [PublicationCommentController::class, 'update']);
-    Route::delete('/comments/{id}', [PublicationCommentController::class, 'destroy']);
+    Route::put('/comments/{id}', [PublicationCommentController::class, 'update'])->middleware('role:communication,priest');
+    Route::delete('/comments/{id}', [PublicationCommentController::class, 'destroy'])->middleware('role:communication,priest');
 
-    // Conseils et services
-    Route::apiResource('councils', CouncilController::class)->except('index', 'show');
-
-    // Demandes de messe : liste du célébrant
+    // Demandes de messe : liste du célébrant (lecture) ; déplacement : secrétariat
     Route::get('/mass-schedules', [MassRequestController::class, 'schedules']);
+    Route::put('/mass-schedules/{id}', [MassRequestController::class, 'moveSchedule'])->middleware('role:secretariat');
+
+    /*
+    | Back-office (lot 3) : /admin/…
+    */
+    Route::prefix('admin')->group(function () {
+        Route::get('/dashboard', [AdminDashboardController::class, 'show']);
+        Route::get('/activities', [AdminActivityController::class, 'index']);
+        Route::get('/integrations', [AdminIntegrationController::class, 'index'])->middleware('role:admin');
+        Route::post('/reorder', [AdminReorderController::class, 'store']); // rôle vérifié selon la ressource
+        Route::post('/mass-requests', [MassRequestController::class, 'adminStore'])->middleware('role:secretariat');
+    });
 });
 
 // PUBLIC ROUTES (accessible sans authentification)

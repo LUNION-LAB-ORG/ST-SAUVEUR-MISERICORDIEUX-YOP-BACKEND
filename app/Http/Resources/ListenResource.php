@@ -27,6 +27,13 @@ class ListenResource extends JsonResource
                 'function' => $this->priest->function,
             ] : null,
             'request_status' => $this->request_status,
+            'assigned_priest_id' => $this->assigned_priest_id,
+            'assigned_priest' => $this->assignedPriest ? [
+                'id'       => $this->assignedPriest->id,
+                'fullname' => $this->assignedPriest->fullname,
+                'function' => $this->assignedPriest->function,
+            ] : null,
+            'proposed_at'    => optional($this->proposed_at)->toDateTimeString(),
             'listen_at'     => $this->listen_at,
 
             // Relations

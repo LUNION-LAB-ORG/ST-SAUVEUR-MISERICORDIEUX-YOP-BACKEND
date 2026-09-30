@@ -15,13 +15,14 @@ class StoreRequest extends FormRequest
     {
         return [
             'fullname'           => 'required|string|max:255',
-            'email'              => 'nullable|email|max:100|unique:users,email,' . $this->id,
-            'phone'              => 'required|string|max:100|unique:users,phone,' . $this->id,
+            'email'              => 'nullable|email|max:100|unique:users,email,' . ($this->route('user') ?? $this->id),
+            'phone'              => 'required|string|max:100|unique:users,phone,' . ($this->route('user') ?? $this->id),
             'password'           => ($this->id ? 'nullable' : 'required') . '|string|min:6',
-            'status'             => 'sometimes|in:active,inactive',
+            'status'             => 'sometimes|in:active,inactive,disabled',
             // Accepte aussi photo en upload (handled in controller)
             'photo'              => 'nullable',
-            'role'               => 'nullable|in:admin,priest',
+            'role'               => 'nullable|in:admin,priest,secretariat,communication,treasurer,movement_leader',
+            'service_id'         => 'nullable|integer|exists:services,id',
             'email_verified_at'  => 'nullable|date',
         ];
     }

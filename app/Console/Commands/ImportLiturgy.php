@@ -48,6 +48,10 @@ class ImportLiturgy extends Command
 
         $this->info(count($imported) . ' journée(s) importée(s), ' . count($failed) . ' échec(s).');
 
+        if ($imported) {
+            \App\Services\ActivityLogger::log('imported', null, \App\Services\AelfService::importDescription(count($imported)));
+        }
+
         return empty($failed) ? self::SUCCESS : self::FAILURE;
     }
 }
