@@ -151,7 +151,7 @@ class BackOfficeActivityAndDashboardTest extends TestCase
 
         $tasks = collect($data['tasks'])->keyBy('key');
         $this->assertSame('2 demandes de messe à traiter', $tasks['masses_to_process']['label']);
-        $this->assertSame('/dashboard/messes', $tasks['masses_to_process']['href']);
+        $this->assertSame('/dashboard/messes?filtre=to_process', $tasks['masses_to_process']['href']);
         $this->assertSame('3 commentaires à modérer', $tasks['comments_pending']['label']);
         $this->assertSame('1 rendez-vous en attente', $tasks['listens_pending']['label']);
         $this->assertSame('1 annonce expire dans 2 jours', $tasks['announcements_expiring']['label']);

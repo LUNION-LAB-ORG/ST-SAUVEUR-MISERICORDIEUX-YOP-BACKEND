@@ -61,7 +61,7 @@ class DashboardController extends Controller
         $currentPhase = collect($project->phases ?? [])->firstWhere('status', 'in_progress')['name'] ?? null;
 
         $tasks = array_values(array_filter([
-            $massesToProcess ? $this->task('masses_to_process', $this->plural($massesToProcess, 'demande de messe à traiter', 'demandes de messe à traiter'), '/dashboard/messes') : null,
+            $massesToProcess ? $this->task('masses_to_process', $this->plural($massesToProcess, 'demande de messe à traiter', 'demandes de messe à traiter'), '/dashboard/messes?filtre=to_process') : null,
             ($n = (clone $pendingComments)->count()) ? $this->task('comments_pending', $this->plural($n, 'commentaire à modérer', 'commentaires à modérer'), '/dashboard/commentaires') : null,
             $pendingListens ? $this->task('listens_pending', $this->plural($pendingListens, 'rendez-vous en attente', 'rendez-vous en attente'), '/dashboard/rendez-vous') : null,
             $homilyTomorrow === 'missing' ? $this->task('homily_tomorrow_missing', 'Homélie de demain manquante', '/dashboard/liturgie') : null,
