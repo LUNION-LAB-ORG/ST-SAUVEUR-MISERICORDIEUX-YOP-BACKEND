@@ -21,12 +21,17 @@ class ActivityLogger
             return;
         }
 
+        // Clé numérique → subject_id ; clé texte (ex. paramètre « parish.phone ») → subject_key
+        $key = $subject?->getKey();
+        $numeric = is_int($key) || (is_string($key) && ctype_digit($key));
+
         try {
             ActivityLog::create([
                 'user_id'      => self::currentUserId(),
                 'action'       => $action,
                 'subject_type' => $subject ? class_basename($subject) : null,
-                'subject_id'   => $subject?->getKey(),
+                'subject_id'   => $numeric ? (int) $key : null,
+                'subject_key'  => $key !== null && !$numeric ? mb_substr((string) $key, 0, 100) : null,
                 'description'  => mb_substr($description, 0, 500),
                 'created_at'   => now(),
             ]);

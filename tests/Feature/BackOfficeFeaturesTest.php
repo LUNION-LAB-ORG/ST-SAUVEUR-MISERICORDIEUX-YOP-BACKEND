@@ -171,6 +171,17 @@ class BackOfficeFeaturesTest extends TestCase
         $this->assertSame('/nouvelle-eglise', Setting::find('hero.primary_url')->value);
     }
 
+    public function test_setting_change_is_logged_with_text_key(): void
+    {
+        $this->admin();
+        $this->putJson('/api/settings', ['settings' => [['key' => 'hero.title', 'value' => 'Nouveau titre']]])->assertOk();
+
+        // Clé de paramètre texte : jamais dans subject_id (colonne entière, rejet MySQL 1366)
+        $log = \App\Models\ActivityLog::where('subject_type', 'Setting')->latest('id')->firstOrFail();
+        $this->assertNull($log->subject_id);
+        $this->assertSame('hero.title', $log->subject_key);
+    }
+
     public function test_secret_setting_is_never_exposed(): void
     {
         $this->admin();
